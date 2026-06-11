@@ -468,10 +468,11 @@ function render() {
     const ordered     = explicit
       .map(id => cardById[id])
       .filter(card => card && getColumn(card) === c.id);
-    const remaining   = byColumn[c.id]
-      .filter(card => !explicitSet.has(card.id))
-      .sort((a, b) => parseDate(b.date) - parseDate(a.date));
-    byColumn[c.id] = ordered.concat(remaining);
+    // Auto-moved cards (stale/rejected by age) have card.column !== c.id — float them to top
+    const byDate = (a, b) => parseDate(b.date) - parseDate(a.date);
+    const autoMoved      = byColumn[c.id].filter(card => !explicitSet.has(card.id) && card.column !== c.id).sort(byDate);
+    const nativeRemaining = byColumn[c.id].filter(card => !explicitSet.has(card.id) && card.column === c.id).sort(byDate);
+    byColumn[c.id] = [...autoMoved, ...ordered, ...nativeRemaining];
 
     const colDiv = document.createElement('div');
     colDiv.className = 'column';
@@ -615,8 +616,16 @@ async function saveModal() {
   } else {
     const idx = cards.findIndex(c => c.id === modalCardId);
     if (idx >= 0) {
+      const prevColumn = getColumn(cards[idx]);
       Object.assign(cards[idx], data);
       uiState.overrides[modalCardId] = column;
+      if (prevColumn !== column) {
+        // Remove from old column's order; prepend to new column's order so it appears at top
+        Object.keys(uiState.columnOrder).forEach(col => {
+          uiState.columnOrder[col] = (uiState.columnOrder[col] || []).filter(x => x !== modalCardId);
+        });
+        uiState.columnOrder[column] = [modalCardId, ...(uiState.columnOrder[column] || [])];
+      }
       saveUI();
       await persistCard(cards[idx]);
     }
