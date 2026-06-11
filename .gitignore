@@ -2,3 +2,6 @@
 job_kanban/cards/*.json
 job_kanban/cards.json
 job_kanban/parsed.json
+
+# Personal build — regenerate locally with: python build_kanban_html.py
+JobHunt_Kanban.html

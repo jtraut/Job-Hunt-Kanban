@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Build JobHunt_Kanban.html from templates + card data.
+Build script for Job Hunt Tracker.
 
-Card data lives in job_kanban/cards/*.json (one file per card).
-Board column config lives in job_kanban/columns.json.
-These are gitignored so your personal job hunt stays private.
+Produces two files:
+  JobHunt_Kanban.html  — your personal board, built from job_kanban/cards/*.json (gitignored)
+  index.html           — public demo, built from job_kanban/card.example.json only (committed)
+
+Card data lives in job_kanban/cards/*.json (one file per card, gitignored).
+Board column config lives in job_kanban/columns.json (committed).
 
 Usage:
   python build_kanban_html.py
@@ -17,11 +20,13 @@ import json
 import os
 import glob
 
-CARDS_DIR   = "job_kanban/cards"
+CARDS_DIR    = "job_kanban/cards"
+EXAMPLE_CARD = "job_kanban/card.example.json"
 COLUMNS_FILE = "job_kanban/columns.json"
-HEAD_FILE   = "job_kanban/template_head.html"
-TAIL_FILE   = "job_kanban/template_tail.html"
-OUTPUT_FILE = "JobHunt_Kanban.html"
+HEAD_FILE    = "job_kanban/template_head.html"
+TAIL_FILE    = "job_kanban/template_tail.html"
+PERSONAL_OUT = "JobHunt_Kanban.html"
+DEMO_OUT     = "index.html"
 
 
 def load_cards():
@@ -37,11 +42,17 @@ def load_cards():
     return cards
 
 
+def build(output_path, cards, columns, head, tail):
+    columns_js = f"const COLUMNS = {json.dumps(columns, ensure_ascii=False)};\n"
+    cards_js   = f"const ORIGINAL_CARDS = {json.dumps(cards, ensure_ascii=False)};\n"
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(head + columns_js + cards_js + tail)
+    print(f"Built {output_path} ({len(cards)} cards, {len(columns)} columns)")
+
+
 def main():
     with open(COLUMNS_FILE, encoding="utf-8") as f:
         columns = json.load(f)
-
-    cards = load_cards()
 
     with open(HEAD_FILE, encoding="utf-8") as f:
         head = f.read()
@@ -49,15 +60,13 @@ def main():
     with open(TAIL_FILE, encoding="utf-8") as f:
         tail = f.read()
 
-    columns_js = f"const COLUMNS = {json.dumps(columns, ensure_ascii=False)};\n"
-    cards_js   = f"const ORIGINAL_CARDS = {json.dumps(cards, ensure_ascii=False)};\n"
+    # Personal build — all cards from job_kanban/cards/
+    build(PERSONAL_OUT, load_cards(), columns, head, tail)
 
-    output = head + columns_js + cards_js + tail
-
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        f.write(output)
-
-    print(f"Built {OUTPUT_FILE} ({len(cards)} cards, {len(columns)} columns)")
+    # Demo build — example card only, safe to commit
+    with open(EXAMPLE_CARD, encoding="utf-8") as f:
+        example = json.load(f)
+    build(DEMO_OUT, [example], columns, head, tail)
 
 
 if __name__ == "__main__":

@@ -62,7 +62,9 @@ Edit the file with your job details:
 python build_kanban_html.py
 ```
 
-This reads all card files and produces `JobHunt_Kanban.html`.
+This produces two files:
+- `JobHunt_Kanban.html` — your personal board with all your cards (gitignored)
+- `index.html` — the public demo, rebuilt from `card.example.json` only (committed)
 
 ### 4. Open in your browser
 
