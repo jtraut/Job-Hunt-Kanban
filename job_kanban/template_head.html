@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Hunt Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f5f7;
+    color: #172b4d;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: #1e293b;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex-shrink: 0; }
+  .search-wrap { flex: 1; max-width: 360px; }
+  #search {
+    width: 100%;
+    padding: 7px 12px;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: #334155;
+    color: white;
+    font-size: 14px;
+  }
+  #search::placeholder { color: #94a3b8; }
+  .header-stats { font-size: 12px; color: #94a3b8; margin-left: auto; }
+  .header-actions { display: flex; gap: 8px; }
+  .btn {
+    background: #334155;
+    color: white;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn:hover { background: #475569; }
+  .btn.primary { background: #2563eb; border-color: #2563eb; }
+  .btn.primary:hover { background: #1d4ed8; }
+  .btn.danger { background: #dc2626; border-color: #dc2626; }
+  .btn.danger:hover { background: #b91c1c; }
+  .board {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    overflow-x: auto;
+    height: calc(100vh - 56px);
+  }
+  .column {
+    flex: 0 0 300px;
+    display: flex;
+    flex-direction: column;
+    background: #ebecf0;
+    border-radius: 8px;
+    max-height: 100%;
+  }
+  .column-header {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #d3d6dc;
+    flex-shrink: 0;
+  }
+  .column-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .column-title { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; flex: 1; }
+  .column-count { font-size: 12px; color: #5e6c84; background: rgba(0,0,0,0.06); padding: 2px 8px; border-radius: 10px; }
+  .column-desc { padding: 4px 12px 8px; font-size: 11px; color: #5e6c84; flex-shrink: 0; }
+  .card-list {
+    padding: 8px 8px 32px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 80px;
+  }
+  .card-list.drag-over { background: rgba(79, 143, 224, 0.12); border-radius: 4px; }
+  .card {
+    background: white;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(9,30,66,0.15);
+    cursor: grab;
+    border-left: 4px solid var(--accent);
+    transition: box-shadow 0.15s;
+    position: relative;
+  }
+  .card:hover { box-shadow: 0 2px 6px rgba(9,30,66,0.25); }
+  .card.dragging { opacity: 0.4; cursor: grabbing; }
+  .card.user-added::after {
+    content: 'new';
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    color: #2563eb;
+    background: #dbeafe;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .card.user-edited::after {
+    content: 'edited';
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    color: #92400e;
+    background: #fef3c7;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .card-company { font-weight: 600; font-size: 14px; color: #172b4d; margin-bottom: 2px; padding-right: 52px; }
+  .card-role { font-size: 12.5px; color: #42526e; line-height: 1.35; margin-bottom: 6px; }
+  .card-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 11px; color: #6b778c; margin-bottom: 6px; }
+  .chip { background: #f4f5f7; padding: 2px 6px; border-radius: 3px; border: 1px solid #dfe1e6; }
+  .chip.salary { background: #e3fcef; color: #006644; border-color: #abf5d1; }
+  .chip.location { background: #deebff; color: #0747a6; border-color: #b3d4ff; }
+  .chip.date { background: #fff; color: #6b778c; }
+  .card-actions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .card-actions a, .card-actions button {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    text-decoration: none;
+    border: 1px solid #dfe1e6;
+    background: #fafbfc;
+    color: #42526e;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .card-actions a:hover, .card-actions button:hover { background: #ebecf0; }
+  .card-actions .edit-btn { color: #0747a6; }
+  .card-notes {
+    display: none;
+    font-size: 11.5px;
+    color: #42526e;
+    background: #fafbfc;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 6px;
+    white-space: pre-wrap;
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid #ebecf0;
+    line-height: 1.45;
+  }
+  .card.expanded .card-notes { display: block; }
+  .empty { text-align: center; color: #97a0af; font-size: 12px; padding: 32px 8px; font-style: italic; }
+  .hidden { display: none !important; }
+  .card.match-highlight { box-shadow: 0 0 0 2px #ffc107, 0 2px 6px rgba(9,30,66,0.25); }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 200;
+    padding: 5vh 16px;
+    overflow-y: auto;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    width: 100%;
+    max-width: 560px;
+    padding: 20px 24px;
+  }
+  .modal h2 { margin: 0 0 16px; font-size: 18px; }
+  .modal-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .modal-row > .field { flex: 1; }
+  .field label { display: block; font-size: 12px; color: #42526e; margin-bottom: 4px; font-weight: 600; }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #dfe1e6;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    background: white;
+    color: #172b4d;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px #bfdbfe;
+  }
+  .field textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #ebecf0;
+  }
+  .modal-actions .left { margin-right: auto; }
+  .required-mark { color: #dc2626; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Job Hunt Tracker</h1>
+  <div class="search-wrap">
+    <input type="search" id="search" placeholder="Search company, role, notes...">
+  </div>
+  <div class="header-stats" id="stats">99 apps</div>
+  <div class="header-actions">
+    <button class="btn primary" onclick="openModal('new')">+ New</button>
+    <button class="btn" onclick="exportJSON()">Export</button>
+    <button class="btn" onclick="resetOverrides()" title="Reset all moves, edits, and additions back to the original card data">Reset</button>
+  </div>
+</header>
+<div class="board" id="board"></div>
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h2 id="modal-title">New application</h2>
+    <div class="modal-row">
+      <div class="field"><label>Company <span class="required-mark">*</span></label><input type="text" id="f-company" required></div>
+      <div class="field"><label>Date</label><input type="text" id="f-date" placeholder="e.g. 6/10/26"></div>
+    </div>
+    <div class="field" style="margin-bottom: 12px;"><label>Role</label><input type="text" id="f-role" placeholder="e.g. Senior Software Engineer, Backend"></div>
+    <div class="modal-row">
+      <div class="field"><label>Salary</label><input type="text" id="f-salary" placeholder="e.g. 150-200K"></div>
+      <div class="field"><label>Location</label><input type="text" id="f-location" placeholder="e.g. Remote"></div>
+    </div>
+    <div class="field" style="margin-bottom: 12px;"><label>Apply Link</label><input type="url" id="f-link" placeholder="https://..."></div>
+    <div class="field" style="margin-bottom: 12px;"><label>Status</label><select id="f-column"></select></div>
+    <div class="field" style="margin-bottom: 8px;"><label>Notes</label><textarea id="f-notes" rows="4" placeholder="Cover letter drafts, recruiter info, interview prep..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn danger left hidden" id="modal-delete-btn" onclick="deleteCurrent()">Delete</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+<script>

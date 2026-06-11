@@ -1,0 +1,4 @@
+# Personal job application data — keep this off the public repo
+job_kanban/cards/*.json
+job_kanban/cards.json
+job_kanban/parsed.json

@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Hunt Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f5f7;
+    color: #172b4d;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: #1e293b;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; flex-shrink: 0; }
+  .search-wrap { flex: 1; max-width: 360px; }
+  #search {
+    width: 100%;
+    padding: 7px 12px;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: #334155;
+    color: white;
+    font-size: 14px;
+  }
+  #search::placeholder { color: #94a3b8; }
+  .header-stats { font-size: 12px; color: #94a3b8; margin-left: auto; }
+  .header-actions { display: flex; gap: 8px; }
+  .btn {
+    background: #334155;
+    color: white;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn:hover { background: #475569; }
+  .btn.primary { background: #2563eb; border-color: #2563eb; }
+  .btn.primary:hover { background: #1d4ed8; }
+  .btn.danger { background: #dc2626; border-color: #dc2626; }
+  .btn.danger:hover { background: #b91c1c; }
+  .board {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    overflow-x: auto;
+    height: calc(100vh - 56px);
+  }
+  .column {
+    flex: 0 0 300px;
+    display: flex;
+    flex-direction: column;
+    background: #ebecf0;
+    border-radius: 8px;
+    max-height: 100%;
+  }
+  .column-header {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #d3d6dc;
+    flex-shrink: 0;
+  }
+  .column-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .column-title { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; flex: 1; }
+  .column-count { font-size: 12px; color: #5e6c84; background: rgba(0,0,0,0.06); padding: 2px 8px; border-radius: 10px; }
+  .column-desc { padding: 4px 12px 8px; font-size: 11px; color: #5e6c84; flex-shrink: 0; }
+  .card-list {
+    padding: 8px 8px 32px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 80px;
+  }
+  .card-list.drag-over { background: rgba(79, 143, 224, 0.12); border-radius: 4px; }
+  .card {
+    background: white;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(9,30,66,0.15);
+    cursor: grab;
+    border-left: 4px solid var(--accent);
+    transition: box-shadow 0.15s;
+    position: relative;
+  }
+  .card:hover { box-shadow: 0 2px 6px rgba(9,30,66,0.25); }
+  .card.dragging { opacity: 0.4; cursor: grabbing; }
+  .card.user-added::after {
+    content: 'new';
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    color: #2563eb;
+    background: #dbeafe;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .card.user-edited::after {
+    content: 'edited';
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    color: #92400e;
+    background: #fef3c7;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .card-company { font-weight: 600; font-size: 14px; color: #172b4d; margin-bottom: 2px; padding-right: 52px; }
+  .card-role { font-size: 12.5px; color: #42526e; line-height: 1.35; margin-bottom: 6px; }
+  .card-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 11px; color: #6b778c; margin-bottom: 6px; }
+  .chip { background: #f4f5f7; padding: 2px 6px; border-radius: 3px; border: 1px solid #dfe1e6; }
+  .chip.salary { background: #e3fcef; color: #006644; border-color: #abf5d1; }
+  .chip.location { background: #deebff; color: #0747a6; border-color: #b3d4ff; }
+  .chip.date { background: #fff; color: #6b778c; }
+  .card-actions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .card-actions a, .card-actions button {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    text-decoration: none;
+    border: 1px solid #dfe1e6;
+    background: #fafbfc;
+    color: #42526e;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .card-actions a:hover, .card-actions button:hover { background: #ebecf0; }
+  .card-actions .edit-btn { color: #0747a6; }
+  .card-notes {
+    display: none;
+    font-size: 11.5px;
+    color: #42526e;
+    background: #fafbfc;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 6px;
+    white-space: pre-wrap;
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid #ebecf0;
+    line-height: 1.45;
+  }
+  .card.expanded .card-notes { display: block; }
+  .empty { text-align: center; color: #97a0af; font-size: 12px; padding: 32px 8px; font-style: italic; }
+  .hidden { display: none !important; }
+  .card.match-highlight { box-shadow: 0 0 0 2px #ffc107, 0 2px 6px rgba(9,30,66,0.25); }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 200;
+    padding: 5vh 16px;
+    overflow-y: auto;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    width: 100%;
+    max-width: 560px;
+    padding: 20px 24px;
+  }
+  .modal h2 { margin: 0 0 16px; font-size: 18px; }
+  .modal-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .modal-row > .field { flex: 1; }
+  .field label { display: block; font-size: 12px; color: #42526e; margin-bottom: 4px; font-weight: 600; }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #dfe1e6;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    background: white;
+    color: #172b4d;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px #bfdbfe;
+  }
+  .field textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #ebecf0;
+  }
+  .modal-actions .left { margin-right: auto; }
+  .required-mark { color: #dc2626; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Job Hunt Tracker</h1>
+  <div class="search-wrap">
+    <input type="search" id="search" placeholder="Search company, role, notes...">
+  </div>
+  <div class="header-stats" id="stats">99 apps</div>
+  <div class="header-actions">
+    <button class="btn primary" onclick="openModal('new')">+ New</button>
+    <button class="btn" onclick="exportJSON()">Export</button>
+    <button class="btn" onclick="resetOverrides()" title="Reset all moves, edits, and additions back to the original card data">Reset</button>
+  </div>
+</header>
+<div class="board" id="board"></div>
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h2 id="modal-title">New application</h2>
+    <div class="modal-row">
+      <div class="field"><label>Company <span class="required-mark">*</span></label><input type="text" id="f-company" required></div>
+      <div class="field"><label>Date</label><input type="text" id="f-date" placeholder="e.g. 6/10/26"></div>
+    </div>
+    <div class="field" style="margin-bottom: 12px;"><label>Role</label><input type="text" id="f-role" placeholder="e.g. Senior Software Engineer, Backend"></div>
+    <div class="modal-row">
+      <div class="field"><label>Salary</label><input type="text" id="f-salary" placeholder="e.g. 150-200K"></div>
+      <div class="field"><label>Location</label><input type="text" id="f-location" placeholder="e.g. Remote"></div>
+    </div>
+    <div class="field" style="margin-bottom: 12px;"><label>Apply Link</label><input type="url" id="f-link" placeholder="https://..."></div>
+    <div class="field" style="margin-bottom: 12px;"><label>Status</label><select id="f-column"></select></div>
+    <div class="field" style="margin-bottom: 8px;"><label>Notes</label><textarea id="f-notes" rows="4" placeholder="Cover letter drafts, recruiter info, interview prep..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn danger left hidden" id="modal-delete-btn" onclick="deleteCurrent()">Delete</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+<script>
+const COLUMNS = [{"id": "saved", "name": "Saved", "color": "#4F8FE0", "desc": "Roles to look at later"}, {"id": "considering", "name": "Considering", "color": "#E0A24F", "desc": "Deciding whether to apply"}, {"id": "recruiter", "name": "Recruiter contact", "color": "#A04FE0", "desc": "Reached out via recruiter"}, {"id": "applied", "name": "Applied", "color": "#5F6F84", "desc": "Application submitted, waiting"}, {"id": "interview", "name": "Interview", "color": "#28A745", "desc": "Phone screen / interview scheduled or in-progress"}, {"id": "offer", "name": "Offer", "color": "#22C55E", "desc": "Received an offer"}, {"id": "rejected", "name": "Rejected", "color": "#C04040", "desc": "No further action - closed"}, {"id": "withdrawn", "name": "Withdrawn", "color": "#888888", "desc": "You withdrew your application"}];
+const ORIGINAL_CARDS = [{"id": "04028b3cb3", "company": "General Motors", "role": "Sr Software Engineer", "date": "9/29/2025", "salary": "143-240K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4305640464/?trackingId=AwV6iPOgTmuBoxrXzOZeQQ%3D%3D&refId=a1BtNuUTSJuujcd2CiXQxg%3D%3D&midToken=AQGO1J-9xBLV9A&midSig=0yrJjeQkGkiHY1&trk=eml-jobs_jymbii_digest-job_card-0-jobcard_body&trkEmail=eml-jobs_jymbii_digest-job_card-0-jobcard_body-null-4wgl8m~mfzomp5n~tn-null-null&eid=4wgl8m-mfzomp5n-tn&otpToken=MTAwYzE4ZTMxYTI4Y2RjN2JjMjQwNGVkNDMxNmVmYjY4ZWNlZDQ0NTllYTY4YTYxNzZjMDA0NmU0NjVkNWNmMmY2ZGY4MGViNTRkYWUxZTc3ZDlhNzY3ODIzMjY2MjE3MWM5MWRkNTkwOGE4ZGFkYTEwZjEsMSwx", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "064da0f846", "company": "Block (proto bitcoin mining)", "role": "Embedded Software Engineer", "date": "4/16/2025", "salary": "207-327K", "location": "REMOTE (Bay Area, CA)", "link": "", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "0ab3287415", "company": "Supabase", "role": "SDK Engineer - Flutter", "date": "3/16/2026", "salary": "", "location": "Remote", "link": "https://jobs.ashbyhq.com/supabase/6a0e111d-6246-43b8-80c3-037303ff9fb2", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "0bae93c2ee", "company": "Milestone Systems Inc", "role": "Sr Embedded Linux Application Engineer", "date": "4/24/2025", "salary": "148-191K", "location": "REMOTE (Oregon based)", "link": "", "notes": "", "status_label": "Rejected", "column": "rejected"}, {"id": "0e196b2284", "company": "GitHub", "role": "Sr Software Engineer, IC", "date": "4/13/2026", "salary": "124-329K", "location": "Remote", "link": "https://githubinc.jibeapply.com/jobs/4896?lang=en-us&iis=Job+Board&iisn=LinkedIn&lever-source=LinkedinPosting", "notes": "Tailored resume and cover letter\nOnly used resume though, no cover letter option", "status_label": "Applied", "column": "applied"}, {"id": "130797c2c2", "company": "Spotify", "role": "Full Stack Engineer - Podcast Platform", "date": "5/11/2026", "salary": "150-189K", "location": "Remote", "link": "https://jobs.lever.co/spotify/69524356-88f8-4a8e-b543-0198670e4ceb?lever-source=LinkedInJobs", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "16af943125", "company": "Torc", "role": "Sr Software Engineer - Vehicle Diagnostics", "date": "6/3/2026", "salary": "160-193K", "location": "Remote / Ann Arbor", "link": "https://job-boards.greenhouse.io/torcrobotics/jobs/8459580002", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "1b73755522", "company": "Cursor", "role": "Software Engineer, Bugbot", "date": "3/29/2026", "salary": "", "location": "Remote", "link": "https://cursor.com/careers/software-engineer-bugbot", "notes": "Project proud of:\nI was tasked with developing a state of the art timing product to be deployed at endurance races around the world. The goal was to create a new hardware product that can uphold the same trusted accuracy and reliability of its predecessors yet at a fraction of the cost and size; making it much more accessible and easily deployed in field. The resulting product was a mobile application (ChronoTrack MobileTrack) available on iOS and Android that also has the ability to pair with a handheld RFID scanner to detect and record athletes on course. I led the development effort in the tech stack and architecture decisions, even making the recommendation to pivot on the underlying hardware pairing selection to help save major costs in support and maintainability. Despite it being my first production mobile application, and working on a very small team as the lead developer, the product was very well received and sold tremendously, now with hundreds in use every weekend at races around the globe.", "status_label": "Applied", "column": "applied"}, {"id": "1bfe890638", "company": "Rise Technical", "role": "Firmware Engineer", "date": "2/2/2026", "salary": "150-250K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4367270186/?trk=eml-email_job_alert_digest_01-primary_job_list-0-jobcard_body_14966042212&refId=jaPGm4H%2Bpi45vZjx8Rwusw%3D%3D&trackingId=3kZCrxVxE3kIehlY3jVCuQ%3D%3D", "notes": "Music tech company!", "status_label": "Applied", "column": "applied"}, {"id": "1dc61d3373", "company": "Figma", "role": "Software Engineer, C++", "date": "3/28/2026", "salary": "153-376K", "location": "Remote", "link": "https://job-boards.greenhouse.io/figma/jobs/5552530004?gh_jid=5552530004", "notes": "Why work at Figma?\nAs a developer and creative mind, it would be very rewarding to contribute to such a powerful platform catered to the designer community. The technology stack and challenges presented are also enticing as someone who always wants to continue learning and sharpening my skillset.", "status_label": "Applied", "column": "applied"}, {"id": "1ffc747f68", "company": "Microsoft", "role": "Software Engineer II", "date": "4/2/2026", "salary": "100-199K (131-215 for specific areas)", "location": "Remote", "link": "https://apply.careers.microsoft.com/careers/job/1970393556768521?utm_source=linkedin&domain=microsoft.com&src=LinkedIn", "notes": "Signed in using Google account", "status_label": "Applied", "column": "applied"}, {"id": "224bd84fac", "company": "Hims & Hers", "role": "Sr Software Engineer", "date": "4/10/2026", "salary": "175-200K", "location": "Remote", "link": "https://jobs.ashbyhq.com/hims-and-hers/e9c6ae96-ca56-40ee-98e8-303fd9a6b132?src=linkedinpremium", "notes": "React Native experience:\nI do not. Although, I do have plenty of experience with ReactJS and Flutter for cross-platform mobile development. I am always eager to learn new technologies and continue to expand my toolkit.\nNative iOS / Android experience:\nYes, I was the lead developer of a cross-platform mobile application at my last job. Although built mainly with Flutter, the app required communication over the MethodChannel/EventChannel with native Swift and Kotlin code due to the complex nature of the technology. The app was designed to be run built in with an embedded RFID handheld scanner that it can constantly communicate with at a system level, or alternatively connect to a BLE handheld scanner for the same purpose of detecting RFID tags then processing and delivering data in-app to external servers. I am happy to say ChronoTrack MobileTrack was very well received by our customers and served as a new cutting-edge technology for the endurance race timing industry.", "status_label": "Applied", "column": "applied"}, {"id": "23f3e201c0", "company": "Urban Sky", "role": "Embedded Firmware Engineer", "date": "4/7/2026", "salary": "120-170K", "location": "", "link": "https://job-boards.greenhouse.io/urbansky/jobs/4208516009?gh_src=rmr0supm9us", "notes": "Denver\nSimilar to Radiometrics & skills from ChronoTrack combined! Also want IC", "status_label": "Applied", "column": "applied"}, {"id": "273b36b8ae", "company": "Samsara", "role": "Sr Mobile Software Engineer - BLE / Connectivity", "date": "5/13/2026", "salary": "154-260K", "location": "Remote", "link": "https://www.samsara.com/company/careers/roles/7266447?gh_jid=7266447", "notes": "Claude Mobile resume & cover letter", "status_label": "Applied", "column": "applied"}, {"id": "27caac6d76", "company": "Turnkey", "role": "Sr Software Engineer - Backend", "date": "4/16/2026", "salary": "150-275K", "location": "Remote", "link": "https://job-boards.greenhouse.io/turnkeycareers/jobs/4139991009", "notes": "Put a tremendous amount of time / effort into the cover letter so make sure to use the turnkey version as the base for future letters", "status_label": "Applied", "column": "applied"}, {"id": "29bbaa789f", "company": "Nira Energy", "role": "Software Engineer", "date": "4/28/2026", "salary": "180-220K", "location": "Remote", "link": "https://job-boards.greenhouse.io/niraenergy/jobs/4576045008", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "2a96d230be", "company": "Syght", "role": "Sr Electrical / Firmware Engineer", "date": "4/4/2025", "salary": "Salary range 150-200K", "location": "Boulder, onsite", "link": "", "notes": "", "status_label": "Rejected", "column": "rejected"}, {"id": "2ae9e115ff", "company": "DuckDuckGo", "role": "Senior Backend Engineer", "date": "5/12/2026", "salary": "178K", "location": "Remote", "link": "https://jobs.ashbyhq.com/duck-duck-go/53022b02-da3d-4fda-8273-c897d27ed50d", "notes": "What is it about DuckDuckGo and this role that interests you?\nThe privacy and trust angle is what drew me first. The default state of the consumer internet is surveillance-economy by design, and DuckDuckGo is one of the few companies that's been pushing back consistently for 15+ years rather than treating privacy as a marketing checkbox. Building tools that let normal people search, browse, and use the web without being tracked or profiled is genuinely worth pointing engineering effort at.\nThe role itself fits how I work. Backend engineering on consumer-facing products at scale, end-to-end ownership of projects, mentoring other engineers, async-first across a fully remote team spanning 15+ countries. That's how I've been working for 7 years at ChronoTrack, and it's where I do my best work. The AI agent tooling listed in the JD (evaluation frameworks, RAG pipelines, prompt engineering) is an area I'm ramping on actively. I'd just started bringing AI into the workflow at ChronoTrack toward the end of my time there, and it drove a real performance optimization on tag-read processing in the AeroTrack pipeline. I'm digging deeper into the agent-engineering side now in my time off.\nHonest note: I haven't worked in Perl 5 before. Go and Node.js are well within reach (I rebuilt a legacy Fortran/C++ system in Go at Radiometrics, and the full-stack JavaScript work transfers cleanly), but Perl would be a real ramp. My career has been defined more by strong fundamentals and picking up new languages quickly than by loyalty to any one stack, so I see it as a learning curve rather than a blocker.\nBackend Engineers at DuckDuckGo are often expected to lead user-facing product engineering initiatives with varying complexity to deliver impact at scale. Please tell us a little about one project you've worked on which you feel demonstrates your ability to lead such projects. It would be especially helpful if you're able to highlight the scale in a quantified way. Please keep your answer to fewer than 200 words.\nChronoTrack's MobileTrack/AeroTrack platform. I was lead engineer end-to-end on a very small team (PM, designer, plus a Principal Engineer during early POC), owning everything from architecture through App Store and Google Play releases.\nThe most consequential decision was scoping the hardware surface. The original PM/leadership vision had us supporting BLE from any iOS or Android phone to a Bluetooth RFID scanner. Early on I pushed to pivot the critical reads onto an embedded Android scanner (AeroTrack) instead, on the same Flutter codebase, deeply feature-flagged. That pulled BLE-on-arbitrary-hardware variability out of the critical path entirely and dropped long-term maintenance cost massively (sustained by me solo for years afterward). Nobody had prior Dart/Flutter experience, but the cost savings of a single codebase across iOS and Android made it worth the ramp. We got up to speed fast.\nScale: the platform served 4,000+ deployed devices across 30,000+ races annually, ingested 10K+ events/sec at peak, and delivered results to 24M+ athletes including the New York and Boston Marathons. AeroTrack became ChronoTrack's best-selling product ever, moving 1,000+ units in its first year with demand consistently outpacing supply through frequent restocks. The early pivot is what made the product reliable enough to scale that way.\nBackend Engineers at DuckDuckGo can work across many different products, Objectives and areas of responsibility. What kind of work would, and would not, excite you as an Engineer?\nWhat excites me: end-to-end ownership of meaty backend problems where the work has real consequences. Distributed systems, real-time data pipelines, performance under load, instrumentation and observability (the kind of work where you have to understand the layers above and below to ship it right). Privacy and security-critical work fits naturally in here too, since the threat model has to live in your head while you build. The team-hat thing isn't new to me either: after ChronoTrack's COVID downsize from a five-person hardware group (EM, QA, senior and junior engineers) down to just me, I owned the whole product line solo for years. The constant flux of the practice and the continuous learning required to keep up is the part of the job I love.\nI'm most at home on the backend, but I've spent the majority of my career doing full-stack work and I'm happy to contribute wherever the team needs.\nWhat wouldn't excite me as much: long stretches of deeply repetitive maintenance with no design challenge, work where the impact isn't measurable, and process-heavy environments where decisions take longer than the work itself. DuckDuckGo's high-trust, async, end-to-end ownership culture is the opposite of that, which is one of the reasons the company is appealing in the first place.\nAsking questions is an important part of our culture, so we’d like to give you an opportunity to ask any immediate questions you might have for us below.\nA few I'd love to ask, in no particular order.\nFirst, on the IC career path: DuckDuckGo's directly-responsible-individual culture for project ownership fits how I prefer to work, and I'd want to understand how the IC track evolves above the Principal level. Is there a Staff or Distinguished engineer path that lets a senior IC keep growing in technical scope without moving into management, or is the further-up path largely management-shaped?\nSecond, on AI agent tooling in practice: the JD lists evaluation frameworks, RAG pipelines, and prompt engineering as familiar territory, and I'd be curious what the current setup actually looks like inside the team. Are there in-house evaluation frameworks, or are you leaning on existing libraries? How prescriptive vs. exploratory are you about which models or providers get used across products?\nThird, on off-site meetups: how often do they happen, and what do they typically look like? I've worked async-first for years and I find the in-person time matters more than I'd have expected for a fully remote team. Having a beer with people I usually only see in async threads is the part I'd actually look forward to.", "status_label": "Applied", "column": "applied"}, {"id": "2bd60bb04c", "company": "CesiumAstro", "role": "Sr Embedded Engineer II", "date": "4/4/2025", "salary": "Salary range 135-160K", "location": "", "link": "", "notes": "Westminster, in-office\nAmazon Frustration Free Setup department\nSpotify - NO\nEtc…? Forget some of the earlier apps lol", "status_label": "Applied", "column": "applied"}, {"id": "2fcaf6a24a", "company": "NVIDIA", "role": "Sr Firmware Engineer - Embedded Controller", "date": "4/4/2025", "salary": "148-288K", "location": "Remote (Santa Clara, CA based)", "link": "", "notes": "", "status_label": "Rejected", "column": "rejected"}, {"id": "361eff194f", "company": "Amazon", "role": "Sr Embedded Engineer Cloud Devices", "date": "1/21/2026", "salary": "144-194K", "location": "", "link": "https://www.amazon.jobs/jobs/3148646", "notes": "Denver", "status_label": "Applied", "column": "applied"}, {"id": "36dd174541", "company": "Buffer", "role": "Senior Growth Engineer", "date": "5/11/2026", "salary": "156-202K + equity", "location": "Remote", "link": "https://buffer.com/journey/6ee07995-2738-4cee-b16d-fc8967674346?ashby_jid=6ee07995-2738-4cee-b16d-fc8967674346", "notes": "Why Buffer?\nBuffer is one of the few companies where \"fully remote, async-first\" isn't a recent pivot. You've been operating this way since 2010, and the habits built around it (transparency by default, public salaries, public roadmap, writing things down) are the working model I've been operating inside at smaller scale for 7 years. The radical transparency piece lines up with how I already prefer to work: direct, in writing, no hidden context. Buffer also sits in a category I find increasingly rare (sustainable and profitable rather than burning runway chasing growth at any cost), and the product is genuinely useful to the small businesses and creators who rely on it.\nOn the role: I see myself contributing most immediately on the data-infrastructure side. Rebuilding tracking infrastructure, designing A/B testing systems, and integrating Segment/Mixpanel/BigQuery is essentially the work I've been doing at ChronoTrack for the last several years (real-time data pipelines, instrumentation, observability), just pointed at marketing analytics instead of race timing. I'm not coming in as a Next.js expert, but my React experience and the polyglot habit of picking up new languages quickly mean the marketing-site, landing-page, and conversion-flow work is well within reach. The end-to-end ownership the JD describes is how I already work.\nTechnical project you led and shipped recently\nThe Flutter mobile app for ChronoTrack's RFID timing hardware. Timers use it to configure scanners, capture and monitor reads, and transfer data to servers for scoring during races where reliability under bad network conditions is non-negotiable. I was lead developer and owned everything from architecture through App Store and Google Play releases. The app shipped to 4,000+ deployed devices running 30,000+ races annually, delivering results to over 24 million athletes.\nThe most consequential decision was scoping the hardware surface. The initial PM/leadership vision had us supporting BLE from any iOS or Android phone to a Bluetooth RFID scanner. Early in development I pushed to pivot the critical reads onto an embedded Android RFID scanner (AeroTrack) instead, on the same Flutter codebase, deeply feature-flagged. The general MobileTrack app stayed available on any phone with manual bib entry (enough for smaller races run by volunteers); the fully-featured version only ran on AeroTrack. That pulled BLE-on-arbitrary-hardware variability out of the critical path entirely, dropped long-term maintenance cost massively, and is the reason the system held up at events the scale of the New York and Boston Marathons.\nAeroTrack, the embedded controller this software ran on, went on to become ChronoTrack's best-selling product ever. It moved 1,000+ units in its first year with demand consistently outpacing supply, and warehouse restocks have continued at a frequent cadence in the years since. Customer feedback stayed consistently positive, and I personally addressed reported issues, shipping fixes within a week or two.\nThe cross-platform Flutter call was the other interesting tradeoff. A single Dart codebase paid off given the small team and identical operator workflows, though it meant writing platform channels to bridge the native scanner SDKs and Bluetooth stack (where the abstraction has real cost). State was modeled as reactive streams into the UI, which kept screens consistent even when the transport flapped. Never regretted that call.\nThe lesson I keep returning to: the right scoping decision early is worth more than any later optimization. Cutting the surface area on the BLE side made the system tractable to maintain solo for years afterward and focused engineering effort on the parts that actually mattered for accuracy and reliability.\nWhich improvements or opportunities would you propose for buffer.com?\nThree angles I'd push, biased toward the data-infrastructure work I bring.\nFirst, programmatic SEO and AEO. Buffer already has one-off comparison pages (like /resources/buffer-vs-hootsuite/). I'd build a small templating system generating a structured network of pages along three axes: competitor (Hootsuite, Later, Sprout, Planable, Agorapulse), industry (e-commerce, agencies, restaurants, nonprofits), and platform (Instagram, TikTok, LinkedIn scheduler pages). Each page draws from per-instance data plus a shared layout. LLM-driven discovery is rising, so I'd also bake in FAQ schema, structured comparison tables, and concise factual blocks for AEO. Measurable outcome: organic and LLM-referrer signups attributed to that page network.\nSecond, a tracking infrastructure audit. Buffer's marketing stack spans Segment, GTM, Mixpanel, and BigQuery, which is standard but drift-prone. I'd walk the event schema across all four, find inconsistencies (events defined differently, fired inconsistently, or missing entirely), and unify upstream with BigQuery as the source of truth. This is essentially the instrumentation/observability work I've been doing for real-time race timing pipelines, just pointed at marketing analytics.\nThird, activation around time-to-first-scheduled-post. Time to first value is the leading indicator of free-to-paid conversion in SaaS. I'd define a single clean activation event (first successfully scheduled post is my hypothesis), instrument it across the funnel, then experiment on compressing it (onboarding variants, channel-selection defaults, contextual AI Assistant nudges). Once that's measured cleanly, every downstream test gets a real number behind it instead of intuition.\nWhat I'd hold off on: pricing-page or paywall experiments, until tracking and activation foundations are solid. Running price tests on top of a noisy funnel produces noisy results.\nTell us about a time you were wrong at work.\nI badly underestimated the scope of a major refactor at ChronoTrack: rewriting the time-synchronization software and underlying services for our deployed hardware controllers. The initial GitLab ticket was poorly defined, and from a quick read I estimated around a month. The actual work took several months and grew into a milestone with roughly a hundred tickets.\nThe technical surface kept widening as I dug in. I was asked to use NTPd as the source of truth, but Chrony fit our case better (offline-tolerant, which mattered because controllers at races often have no network). Letting time sync write directly to the underlying Linux system time had cascading consequences: both the application and the powerboard firmware originally assumed Linux time wouldn't make big jumps and only applied small calculated correction offsets. Application \"time syncs\" had been adjusting UI offsets, not real OS time, which is why drift kept showing up in race results. Fixing it properly meant deep rewrites of both the app and the firmware to handle real OS-level time changes, plus supporting the full matrix of sync sources (NTP, GPS, manual input, controller-to-controller UDP, external USB device), each with several sub-tickets of its own. I did the engineering solo, working directly with the PM and a designer on the UI flows that changed.\nWhat I learned: get the real scope up front with explicit acceptance criteria before estimating. For a refactor, the research budget needs to come before the estimate, not after, so you actually know what's load-bearing and what's broken. And the only way through a project that big when you're the only engineer on it is to break it into a Kanban of small, well-defined tickets and chip at it day by day. The system eventually shipped with sub-millisecond accuracy across fully distributed edge hardware fleets, and customer confidence in ChronoTrack's timing recordings came back.\nShare your experience with content creation or social media.\nHonestly, not much to share here. I keep a small private Instagram and that's about it; I've never run a blog, newsletter, or public-facing social account. My creative output goes into engineering work and the written-documentation side of it (internal design write-ups, GitHub READMEs, async decision discussions) rather than public content.\nThat said, I respect what the people Buffer serves are doing. Small businesses, creators, and solopreneurs who post consistently to grow their audience are running a much harder discipline than it looks from the outside, and building tools that make that easier is good work to point engineering effort at. I don't need to be a content creator to build for them well, but I'd want to spend real time understanding how they actually use the product.\nShare a quick 2-4 min video about something you’ve learned recently.\nHey, I'm Jake. I decided to pinpoint on a post I read recently that struck a chord on the future of my career as a software engineer and where the industry is headed as a whole.\nThe post is \"Conductors to Orchestrators: The Future of Agentic Coding,\" by Addy Osmani. The argument is that the engineering job is shifting away from writing every line of code yourself, and toward orchestrating multiple AI agents working in parallel. You set the goals, you define the specs, you review the plans, you integrate the results. The humans hold the architectural picture and the quality bar. The actual keystrokes are getting outsourced.\nThe way it locked in for me is this analogy: the artist, the paintbrush, and the canvas.\nThe canvas is the finished product. It hasn't changed. It's still got to be polished, still got to be held to the same standard. That part of the job is unchanged.\nBut the paintbrush is what's changed.\nIt used to be one stroke at a time. Every line of code, every test, every refactor, you were holding the brush and laying down each stroke yourself. Now it's a different kind of brush. You give it the artist's vision and it lays the work down without you doing every individual stroke. You still have to know what you want. You still have to know where it goes. You still have to know what's wrong when it comes out off. But you're not bottlenecked by the mechanics anymore.\nWhat that's actually changed in how I work day-to-day: I plan more deliberately before I start. I write specs and intent in plain language up front. I treat agent output as a draft to verify, not a finished commit. The architectural calls and product-scoping tradeoffs, I still make myself, because that's where the value is. But code that's mostly translation of clear intent into syntax, I'm increasingly letting an agent draft, and then I review it hard.\nThe way I'd summarize it: I'm operating one level higher up the abstraction stack than I was a year ago. Same engineer, different altitude. And honestly, it's made the work more interesting, not less.\nThanks for watching.", "status_label": "Applied", "column": "applied"}, {"id": "461835bdb7", "company": "NVIDIA", "role": "Sr System Software Engineer, Tegra UEFI Firmware", "date": "11/13/2025", "salary": "148-287.5K", "location": "Remote (Boulder CO)", "link": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/Senior-Systems-Software-Engineer--Tegra-UEFI-Firmware_JR2005155", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "4788cd29de", "company": "CivicPlus", "role": "Sr Software Engineer II", "date": "3/24/2026", "salary": "119-181K (180K requested minimum)", "location": "Remote", "link": "https://civicpluscareers.ttcportals.com/jobs/17497443-senior-software-engineer-ii?__jvst=Job+Board&__jvsd=LinkedIn", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "493a2039f4", "company": "Netflix", "role": "Android Software Engineer 5 - Games Client Foundations", "date": "6/10/26", "salary": "388-558K", "location": "Remote", "link": "https://explore.jobs.netflix.net/careers/job/790313607309", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "4fbe32144d", "company": "Spire", "role": "Sr Software Engineer", "date": "9/19/2025", "salary": "130-171K", "location": "Hybrid Boulder", "link": "https://www.linkedin.com/jobs/view/4302595249/?refId=yxugLwu05PxIgY%2BJpPfsSw%3D%3D&trackingId=lYSk8Huet5uy%2BxyK9kp68g%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "5006ceb20a", "company": "Zone 5 Technologies", "role": "Embedded Software Engineer III/IV", "date": "2/10/2026", "salary": "150-200K", "location": "Remote", "link": "https://job-boards.greenhouse.io/zone5technologies/jobs/5032964008", "notes": "Intro interview scheduled April 30th!", "status_label": "Interview scheduled", "column": "interview"}, {"id": "50f776bc02", "company": "Turing", "role": "Remote Software Developer", "date": "3/26/2026", "salary": "", "location": "Contract / Remote", "link": "https://www.linkedin.com/jobs/view/4391118592/?alternateChannel=search&eBP=CwEAAAGdKzzx30uk4Oc3hlZViII71BO92ej3-lordJ2nuc_99uoUw5j1fJQ-9P79c9qPHMgfxs4HMOnOxSxsCb4HO5Xk9_h1X1nerDHBZufXrw0_k6DRUMC_Sfsso3YxT_9ZmwzfEph8Yj2DnB8OinCJFUuW8hg-wV28x8I-oPPldEBgaGnpzhBBDpdxiAPyFgjKmpKvjPIQA491cUsRRPaUNiIv-jfMo6toGNc9UcP4duSSdV1-UzAarJ_oaZwfrb2Jt5wTy5JF2u1Q5UOL_Nwn1WkxXtmx7LSh2PmC46tfTG6wE5uaObvIPnIjqFWJciCFCXLXiLLcffQ0-QZD7Poyol4V0nNgYld4kNd2Tr__ZoSdGGjTJ6J0xKoqmXFslxVgqlBu34a_dJcQ01SPUlgEC1T7nFOH-g-CpuR5Eml7AGBqL3PX7QtVrVKR6tsTWXhOqNPlB9-hICMHEl7knVO-aChrtRtysZlTsNbPO3zuyzbobZZV2_dx-zxsC7X9i_Lgy07U1L_E3zHK_je7tuJ_Fa9uz6ep9go&trk=d_flagship3_postapply_next_best_action&refId=omj%2BaT0U2QxWWrxt4eV9VQ%3D%3D&trackingId=AY70vOqRHNVWTLEkWZbyPA%3D%3D", "notes": "Review & refine AI written code\nBlew the technical interview challenge coding assessment", "status_label": "Rejected (after interview)", "column": "rejected"}, {"id": "50f9373710", "company": "Intercreate", "role": "Firmware Engineer", "date": "1/27/2026", "salary": "", "location": "Boulder, CO (hybrid)", "link": "https://www.linkedin.com/jobs/view/4354262640/?alternateChannel=search&eBP=CwEAAAGcAfuH80oUYZ5ITjM88ox28dUfb9x4ixmgyUAWfoasAhOwZobNuQBOmo_9IotcCNIVdEElp_ZVRiLi_PYPz2sVIfTzbLB7HIjS0r6kztvcDDkmVxq2betj_Ox3JO6CX0z0D4Qwnn3yO-6BpEBoQROAg4ggobm0uUUBdwwRrAgyFgcqXqZKDBfLqtow_10-qUksu6KX76O_8l4JTeIoJZ6RVUAPGRCi0hP52Zh7Q1b2ky_LyQX0xcvcJ4jk4sSo-YqyVn65aI54NJHsooYP53IvnAgwLQ3EzM8ybZs4UpHKg_kX8iakgXE8ypBWkXAiGVFeTGWgD1cYpcb26qIKCdk6uJLE6IWorHyac2PFTdC3w_DDEigi_ccdQbg_K1t7WR6hhewezZs8kcVbHZqxBIsGzM_alLDTUPJaRDj5dKziMTUZZT4ZU6IRlcEJ-HErmoGq532es1BufxuSb6U_OIuwrLQTfvcrUbJmPdQXb_kHF70It-mK1KseRyI&refId=NuwkrzC1MSBSQldlzCfyuw%3D%3D&trackingId=FCluPUe9u%2BndLGudQJgHhw%3D%3D&trk=d_flagship3_postapply_next_best_action", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "514edc5b3b", "company": "GitLab", "role": "Sr Backend Engineer, Analytics Instrumentation", "date": "5/6/2026", "salary": "117-252K", "location": "Remote", "link": "https://job-boards.greenhouse.io/gitlab/jobs/8451512002", "notes": "Asked for referral from LinkedIn connection", "status_label": "Applied", "column": "applied"}, {"id": "53bc19aac0", "company": "Ladders", "role": "Sr Debugger Software Engineer", "date": "4/2/2026", "salary": "221-507K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4396665571/?eBP=CwEAAAGdT1UyCoVfvuD_1FwBA9IrVRgkkU6DNMtisBChWZoy1pyUhYrlu8YIMbrDeZEF5Lg-qgEy4OpLoqlEcK3VbW11Hu09IotjobJP8eFoVT28vNE0N4cSwZA16srfbDPnWT9wz3lYhipV7WjDYfNuo9QIwQ5xK77-WiZ2R-GBHXzq8YZizQBZ3qBufoPCpHvvkpxo7fkM_zfsCw6LtqkFNeZvXWIvAMqeQoI0hgxxcQhECFebpdoplMvOLCOfr2Rb4raF-vYcrGg_esdql0DSg2PmKdui8lrffNOKn7h4_8D0ehWuOGwUOiN6sIe7CBNzCo_7J8U2FL4RKa1VvXmFkKaM8Nutex_s2rRhehWNHLuaUkPG51HPIN5_WQmUvAG0JiSFLSKehY7GKpZEwbCzUyQ8gNrwKoPW7hHvI7-fR-rmXBYd3lF1W7qIs-pRy50252JH9oi91fFngSI4ATSLsAG1Wc_j3zQ4aeLUTprhjrnAMGhdjqRxN2r_PGG46Srsa7I8jM3liquirlvYALwoPmMKQkIxnFsqJxukiz2a_fdVT_L6mw&trk=flagship3_job_collections_leaf_page&refId=nsmG%2BS52hS8EKCTv7lQkIQ%3D%3D&trackingId=uvtJCgvL7TrYyuy1G5bozQ%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "54bc657c60", "company": "Daikin Comfort Tech (Venstar)", "role": "Sr Embedded Software Engineer", "date": "4/16/2025", "salary": "134-185K", "location": "REMOTE (Cali based)", "link": "", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "54e32aded0", "company": "Cents", "role": "Embedded Firmware Engineer", "date": "1/27/2026", "salary": "120-160K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4322920806/?alternateChannel=search&refId=NuwkrzC1MSBSQldlzCfyuw%3D%3D&trackingId=hbRDVHVfT4imfm3Mcg7yeg%3D%3D&trk=d_flagship3_jobs_discovery_jymbii&lipi=urn%3Ali%3Apage%3Ad_flagship3_jobs_discovery_jymbii%3BCzKWhEr9Rniej92mnoICAA%3D%3D&lici=hbRDVHVfT4imfm3Mcg7yeg%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "634ddcf64b", "company": "Cents", "role": "Embedded Firmware Engineer", "date": "4/7/2026", "salary": "120-160K", "location": "Remote", "link": "https://www.linkedin.com/jobs/collections/remote-jobs/?currentJobId=4322920806&discover=true", "notes": "Reapplied with better resume\nJK they didn’t accept the new application because the one from Jan is still under review / have to wait 6 months to reapply…", "status_label": "Applied", "column": "applied"}, {"id": "66a86357c5", "company": "Airbnb", "role": "Sr Software Engineer, Data Infrastructure", "date": "4/11/2026", "salary": "191-225K", "location": "Remote", "link": "https://careers.airbnb.com/positions/7683174/", "notes": "Tailored resume and cover letter\nNo confirmation email…?", "status_label": "Applied", "column": "applied"}, {"id": "67a3b8e07d", "company": "Capgemini", "role": "Sr Embedded Engineer - Medical Devices", "date": "4/9/2025", "salary": "73-170K", "location": "Lakewood CO (hybrid, mostly onsite?)", "link": "", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "687a5047b2", "company": "Inspiren", "role": "Sr Software Engineer Backend", "date": "5/13/2026", "salary": "175-200K + equity", "location": "Remote", "link": "https://job-boards.greenhouse.io/inspiren/jobs/4892415007", "notes": "Claude FullStack resume & cover letter", "status_label": "Applied", "column": "applied"}, {"id": "6910567fc7", "company": "Fresenius Kabi", "role": "Sr Principal Embedded Engineer", "date": "1/30/2026", "salary": "135-145K", "location": "Remote", "link": "https://builtin.com/home/jobs/matches?preferenceId=ca90066c-870a-4636-af9d-5f8aa46c10b5&jobPreferenceEnum=Remote&industryId=183&jobid=7952667", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "6ad9e7ff62", "company": "Urban Sky", "role": "Embedded Software Engineer", "date": "9/18/2025", "salary": "120-160K", "location": "Hybrid Denver", "link": "https://www.linkedin.com/jobs/view/4301519645/?refId=VxSi6HyfR9OmVAfRFVdehQ%3D%3D&trackingId=XKuC%2FRbrShCLhwZnzbujoQ%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "6bd1ae8205", "company": "Owner.com", "role": "Full stack engineer", "date": "3/27/2026", "salary": "160-190K", "location": "Remote", "link": "https://www.owner.com/careers/role?=c39ef087-95b7-4328-b791-8b257ffd4682", "notes": "Ideal tech stack\nReactJS for frontend and C++/Scala/Go on backend, or Dart/Flutter for cross-platform mobile applications. Always happy to pick up new technologies on the job.\nProject proud of\nI had the honor of being the lead developer taking a mobile application product that was cutting edge for the company from concept to production; and got to witness it sell remarkably. Despite it being my first production mobile app project, and mainly the sole developer aside from teaming with the Principal Engineer to reach POC, the product (ChronoTrack MobileTrack) was very well received and required minimal maintenance.\nWhat interests you about Owner.com\nIt is meaningful work to help support small businesses and the work culture and tech stack is very inviting.\nAnything else\nI am always looking to grow and happy to be tasked with new challenges, even if it requires picking up foreign technologies. For example, when deciding on a tech stack for ChronoTrack MobileTrack I pushed the decision on Dart/Flutter for the cross-platform extensibility despite no developers having background knowledge of the stack. This saved us countless hours removing the need to support separate native apps for iOS and Android.", "status_label": "Applied", "column": "applied"}, {"id": "6cca4742fb", "company": "In contact with recruiter, Ashley Vigil, with DotConnect LLC, provided resume to see if she has any embedded firmware jobs available. She reached out first in attempt to hire for a travel company, but it’s all mobile app, web, email drip campaign etc.", "role": "", "date": "4/28/2025", "salary": "", "location": "", "link": "", "notes": "ashley@dotconnectllc.com", "status_label": "Applied", "column": "applied"}, {"id": "7117d29ec1", "company": "RedWire / Edge Autonomy", "role": "Sr Embedded Engineer", "date": "1/29/2026", "salary": "115-150K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4356193905/?trk=eml-email_job_alert_digest_01-primary_job_list-0-jobcard_body_14966042212&refId=GuIGgERUWbYtcGXj2W4SvA%3D%3D&trackingId=eohTCxgVue0f6Kl4GOBunA%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "7137815821", "company": "BeatStars", "role": "Lead backend engineer", "date": "4/16/2026", "salary": "192-248K", "location": "Remote", "link": "https://careers.beatstars.com/job?id=4663943006", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "76a639ccd5", "company": "Global Connect Technologies", "role": "Sr Firmware Engineer", "date": "2/10/2026", "salary": "", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4366753815/?eBP=CwEAAAGcSNPrjfaX49SW4XBt3hlmAx62kx7g51y8CS-I3_nQCOGGwv3W9HJZlJlyS-PEbedqk_6cmg3qobyQ7ZqX4d378Ywf92hn9m5vGgAy1ItjqN1AaMO1CKt9vZua78U0pFFtVAg5LptGgX4VUluKPItjwynz4-i0iL9CcqZhXuxYyMaX3qeRdrYxFg9Zg8y1T-ijLvwsUu1B4KtkPIeqhdrMyl2Zl-vErhaiX-2ecnHBsUnn17mMMMs08XitRhKNZfhD_7XzujHJRDyErDFSVlQR3TuLcUb8DWx04XzdVfPkEPpZCXk5_XKAfZAUtFYcuv96FZYShrNH-yxbUhftK3meP-VI9fk06cOFveb_GFUWJM39YBd_L_VquDOGBUOwwqHiIuRsCPaRlEcP-kuPqtkxf2Yuudcq6og7v2n5Gw-8tM1T8KtRV3b9r2_qeTAiuIYo9OmQrBe8UfdZSmy5pozU7Gs0y_ov_f9NdVMkP2ekqTKokb_JwZwFg0BawFwHmCk&trk=flagship3_jobs_discovery_jymbii&refId=AiY2q67jhzKPjrBA7T4W8Q%3D%3D&trackingId=MIO57MZkqXW0aLljc4umFA%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "7c28d588ac", "company": "QSC", "role": "Sr Embedded Software Engineer Linux", "date": "9/9/2025", "salary": "123-161K", "location": "Boulder, CO (remote)", "link": "https://qsccareers-qsc.icims.com/jobs/4633/senior-embedded-software-engineer---linux/job?mode=submit_apply", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "7eb77f63fb", "company": "Latitude AI", "role": "Sr Embedded Software Engineer, Networking", "date": "5/13/2026", "salary": "179-268K", "location": "Remote", "link": "https://job-boards.greenhouse.io/latitude/jobs/7686940", "notes": "Claude Embedded resume & cover letter\nFAILED TECH SCREEN :(\nDidn’t have the fundamentals down (college stuff), spent all my time studying the JD high level stuff", "status_label": "Rejected (after interview)", "column": "rejected"}, {"id": "7fb8e5fe5a", "company": "Handshake", "role": "Software Engineer, AI Trainer", "date": "4/10/2026", "salary": "", "location": "Remote", "link": "https://app.joinhandshake.com/explore", "notes": "Various contract work\nThis is the ai trainer board", "status_label": "Applied", "column": "applied"}, {"id": "810befcbf5", "company": "NestMed (NextMed?)", "role": "Sr Software Engineer, Backend", "date": "3/30/26", "salary": "220-280K", "location": "Remote", "link": "https://jobs.ashbyhq.com/nestmed/d917b800-6247-4b40-9444-c717940778d4?utm_source=7xvod9oLXJ", "notes": "Part of the “founding” engineers, i.e. take ownership etc and likely become a lead/principal engineer if do the job well\nApplied with IC resume to demonstrate ownership and self discipline working on a small team", "status_label": "Applied", "column": "applied"}, {"id": "835cd1b105", "company": "Tandem Diabetes Care", "role": "Sr Embedded Engineer", "date": "12/23/2025", "salary": "177-200K", "location": "Remote (San Diego based)", "link": "https://www.linkedin.com/jobs/view/4344611350/?refId=ZdYZCzs0ThyUUQfMo%2BJ9lQ%3D%3D&trackingId=NgXux1N3S8OAdSwsNxY2jw%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "8407c8f8f4", "company": "Blue River", "role": "Embedded Software Engineer", "date": "9/9/2025", "salary": "125-218K", "location": "Remote", "link": "https://www.bluerivertechnology.com/job/?gh_jid=7107087&gh_src=dc3972ff1us", "notes": "", "status_label": "Rejected", "column": "rejected"}, {"id": "86c7bef05e", "company": "CarBahn", "role": "Firmware Engineer - Automotive Microcontroller Systems", "date": "4/16/2025", "salary": "130-160K", "location": "", "link": "", "notes": "Littleton, CO, in office", "status_label": "Applied", "column": "applied"}, {"id": "874970ff5d", "company": "Swiftly", "role": "Sr Software Engineer IoT", "date": "5/1/2026", "salary": "140-205K", "location": "Remote", "link": "https://jobs.lever.co/goswift/5e98cddf-65e5-427a-807b-bc604802eb86", "notes": "Embedded systems / TCP/UDP / IoT / Serial Comms etc.\nWhy interested in this role?\nSwiftly's work sits at an intersection I find genuinely compelling — embedded systems and IoT, but with real-world stakes that matter to millions of people every day. Public transit is one of the few domains where reliable software directly affects whether someone makes it to work on time or misses a medical appointment. That's meaningful.\nThe technical scope of this role is also a strong fit for how I like to work — owning the full vertical from edge device software through cloud backend, rather than staying narrowly in one layer. I've spent years doing exactly that with field-deployed hardware, and the idea of applying that experience to transit infrastructure at Swiftly's scale is truly exciting to me.", "status_label": "Applied", "column": "applied"}, {"id": "8be850f330", "company": "Veeva", "role": "Sr Full Stack Software Engineer", "date": "3/27/2026", "salary": "110-270K", "location": "Remote", "link": "https://careers.veeva.com/job/8113a2a8-7621-4849-8e9d-7302aa9d83aa/senior-software-engineer-full-stack-boston-ma/?lever-source=veeva-career-site", "notes": "Actually application failing to submit… (worked 3/27)\n180-230K\nIt would be a pleasure to work at a high growth company with a positive mission; while having the opportunity to work with new technologies and continue sharpening my skills as an engineer.\nExtensive experience with React JavaScript and Java-based platforms. Love building products out end-to-end. Have a track record of taking ownership over company products and making the right decisions to ensure product performance and reliability.", "status_label": "Rejected", "column": "rejected"}, {"id": "8f11774e7c", "company": "AirGarage", "role": "Sr Embedded Engineer", "date": "2/12/2026", "salary": "180-210K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4339219511/?eBP=CwEAAAGcRKL3z6dYJFNpUXzi0BZkyrhuMVQS2rf1dVDabld59PH5DBuimcwIrxUS4CxSSV1H4Nkw890PZH7JTgSZ3wW4JGyhm7VTYXSLlagcdr4vyh6lURoDeSoW5DxKbpto8Lb7AkWvkgjeZc53miDW7mo7qMh8AN8zjnqQQHKOyNfsYwltsDEYz6_-ckotvQR7mmRL9CYpH3ZXH-ziBZ2J_1srh3yVEUYRPJ0RQa4IYmLeVElxiyWxCWHY46zE26-TmYpMwWpI_NxD_90GXZ5bgVQkyEGCOwrRDhFBG4cF9lNwafnTMuz2rdy_q-9OjIZqAZI9HpyIxUD6XWeOAjO9fdUAXh8J84Be0snBnmh8q4Wd7UjKD5g3eS_G0wf6wu3d_f3U6sJQhCiBt90pCvOswgrYhuzvDSbEGNZm0pb41m5gyqfqndlSxf2xeEI&trk=eml-jobs_jymbii_digest-job_card-0-jobcard_body_4339219511&refId=eLv5F1USSjmudioZy8VRSA%3D%3D&trackingId=tqzvG4yASW%2B5P8wg%2F%2FSSsA%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "8f8efc9cc7", "company": "Coinbase", "role": "Sr Software Engineer, Staking Orchestration", "date": "3/24/2026", "salary": "186-219K", "location": "Remote", "link": "https://www.coinbase.com/careers/positions/7603746?gh_jid=7603746&gh_src=20687b321us&source=LinkedIn", "notes": "", "status_label": "Rejected", "column": "rejected"}, {"id": "9414ddc785", "company": "Ashby", "role": "Sr Software Engineer, Product Engineering  - NO (follow up???)", "date": "3/19/2026", "salary": "153-198K", "location": "Remote", "link": "https://jobs.ashbyhq.com/Ashby/751768c6-8d97-4e91-a57d-6b85ce4b5a37/application?utm_source=PRgMeEgv1Z", "notes": "What is most important to you in your next role?\nThe described work culture hits right at home for me, coming from a previous job working as an individual contributor taking full ownership over the software/firmware of the hardware products offering at the company. I started with a team of embedded engineers (~5) but that was short lived when the COVID-19 pandemic hit and the team was downsized to just me reporting to the product owner, founder, and president for the remainder of my time (~6 years). I grew to love the self-managed environment, taking full ownership in my work. I look forward to being able to do that again while having the privilege to indulge in new technologies and continue expanding my skills.\n1-2 sentences, tell us about a challenging project you’re proud of.\nI had the honor of being the lead developer taking a mobile application product that was cutting edge for the company from concept to production; and got to witness it sell remarkably. Despite it being my first production mobile app project, and mainly the sole developer aside from teaming with the Principal Engineer to reach POC, the product (ChronoTrack MobileTrack) was very well received and required minimal maintenance.", "status_label": "Applied", "column": "applied"}, {"id": "97da5e047a", "company": "Articulate", "role": "Sr Software Engineer 360 Web", "date": "5/4/2026", "salary": "137-182K", "location": "Remote", "link": "https://jobs.lever.co/articulate/eaffc633-00bc-42e3-bd33-ca22eddf7980", "notes": "What excites you most about software development?\nThe moment a system you've designed actually works under real-world conditions — when something you built is being used by real people and holds up. Beyond that, I'm drawn to the problem-solving process itself: breaking down something complex into clean, well-reasoned pieces. There's a particular satisfaction in writing code that's not just functional but genuinely maintainable — where the next person to read it can understand exactly what's happening and why.\nWhich 3 technologies are you most proficient in?\nC++ and Scala on embedded Linux — where I've spent the most cumulative hours, optimizing production systems at a low level.\nReact.js — my primary frontend tool for building user-facing interfaces.\nAnd Python — my go-to for backend services, data pipelines, and scripting across most of my recent work.\nPart of this role may focus on Localization projects - not a must have, but do you speak any languages outside of English or have exp with linguistics?\nI don't speak additional languages, but I do have hands-on experience building multi-language applications. On the React.js frontend I've worked with internationalization patterns where global language settings drive which translated strings are rendered — pulling from JSON translation files using key identifiers in components rather than hardcoding English text directly. So while my background is on the engineering side rather than linguistics, I'm familiar with how localization is structured at the code level.", "status_label": "Applied", "column": "applied"}, {"id": "985e81759d", "company": "Reddit", "role": "Sr Software Engineer, Android Test Engineering", "date": "12/23/2025", "salary": "190-267K", "location": "Remote", "link": "https://job-boards.greenhouse.io/reddit/jobs/7488862?gh_src=8a8a4d8a1us", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "9ad3a0789b", "company": "The Crypto Recruiters", "role": "Sr Flutter Developer", "date": "3/17/2026", "salary": "180-200K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4384198880/?eBP=CwEAAAGc_Pj0hgmf_iz2uLbfUnpdRBIz3CZ32cFjiY0ee2drYqizLgKbF4OLMUdhKfyshNFd5LgXTAL-_wJX441VpH1nI9A1dRts_6Pd01NSVfxb4OnPJCyq-vAn5LvQ5MKEIKfTj1taF1Jh8kpe3NWV7_eG1z5kwkTSBQuBvRUKyFn68kQK0p61Ho-tB_9syAgVyT3RIhaYcg7LecAoQtDuKbe5w-O6FDt4IaF2GOpyJfAjyS6cZaC-NRO08-FtErHkiTC48LkUWtXPpW14xpET8X-GtE4CcmHdt-Umv3W02t0pX7gt0tdlrt10HbGnD6NCajY3ECXbGzKfOuJDb7F3VbjJYSlV4mN9-dhWgsObfcOzcxjWaKrFz7cptgf-51BkRcovAT-pYUggnJdyQwRHEdE5wZE9dJ54pYsdnO3oVz9gReK9h585abpkA4-S15JMs0SUHtk7nPq7SwKYACt1foM0c31gZjl_uZo42VICp9lGl3ZoQ4FXbJcQwtBXmwMvq_4GiIrtQ3eLVHAN-tNLrS1q28KQQHza8Sps&trk=flagship3_search_srp_jobs&refId=SWpyl05hF8W0J4%2BhbILzkw%3D%3D&trackingId=uHVySfR2gJiXkCGWVJAlVg%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "9b85f2c705", "company": "Korg USA Inc", "role": "Sr Software Engineer - Embedded Linux", "date": "5/14/2026", "salary": "140-185K", "location": "Remote", "link": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=548a24d5-22f0-4d9f-8744-aa8b58c8b662&ccId=19000101_000001&jobId=590198&source=CC2&lang=en_US", "notes": "What is your favorite synthesizer or electronic music gear, and why?\nHonestly, I am not deeply versed in synth brands or models, so I will tell you what has always grabbed me instead: the looper pedal. Watching a single musician layer a guitar line, a bass groove, a vocal, and percussion into something that sounds like a full band, built live in front of you, never gets old. It also lines up with how I think about engineering. The individual layers do not do much in isolation, but composed together with care they become a coherent piece of music, the same way the small components of a software stack only add up to something when they fit together right.\nDesired salary?\n$180K\nDo you want to tell us anything else about yourself?\nJust that Inner Wave is one of my favorite modern acts. Their whole sound leans on layered, atmospheric synth work, which is part of why this role at Korg lands for me; the chance to work on the gear behind records like that would feel pretty special.", "status_label": "Applied", "column": "applied"}, {"id": "9d7054e561", "company": "DataAnnotation", "role": "Software Engineer, AI Trainer", "date": "4/8/2026", "salary": "", "location": "Remote", "link": "https://app.dataannotation.tech/workers/onboarding", "notes": "Various contract work\nCompleted take home assessment etc., now under review (think did very well)", "status_label": "Applied", "column": "applied"}, {"id": "9efce25bad", "company": "Oxeham Group", "role": "Embedded Software Engineer", "date": "9/18/2025", "salary": "170-190K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4300337192/?refId=fg38GDGdQYWMa%2BXTFbF49w%3D%3D&trackingId=F%2Bsco9IqSw2a3ME6363pLQ%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "a118e825c4", "company": "SpruceID", "role": "Senior Mobile Engineer", "date": "5/31/2026", "salary": "$140-180K", "location": "Remote", "link": "https://jobs.ashbyhq.com/spruceid/5ee0f73c-a24e-41fa-80e0-bb058bc233e4", "notes": "Additonal Info (mini cover letter)\nI was the lead developer on MobileTrack, a Flutter application that shipped to App Store and Google Play and also runs as the operating software on AeroTrack, our embedded Android RFID scanner that became ChronoTrack's best-selling product. Inside MobileTrack I wrote the native Kotlin and Swift modules behind the Dart Event Channel for the low-level OS surface a managed framework cannot reach: BLE, hardware I/O, and device-native settings. I have not worked on verifiable credentials or DIDs specifically, but the privacy-first identity wallet mission and the cross-platform / native-bridging work are a clean continuation of the work I have been doing.", "status_label": "Applied", "column": "applied"}, {"id": "a1faa5df6e", "company": "Automattic", "role": "Experienced Software Engineer", "date": "5/8/2026", "salary": "70-170K", "location": "Remote", "link": "https://automattic.com/work-with-us/job/experienced-software-engineer/", "notes": "What’s motivating you to explore an engineering role at Automattic and why now?\nSeven years owning a Linux-based distributed platform end-to-end at ChronoTrack — backend, real-time pipelines, AWS, hardware integrations, mobile client — wrapped up earlier this year, so I have time to choose carefully. Automattic's working model is what I've been operating inside at smaller scale: fully distributed, async-first, written communication as the default, full-stack ownership the norm. Two creed lines I see myself in — \"I will communicate as much as possible, because it's the oxygen of a distributed company\" and \"I won't just work on things that are assigned to me.\" The second is how I ended up owning the whole stack at ChronoTrack instead of a slice.\nWhat you build matters too. The open web is one of the few pieces of internet infrastructure that still belongs to the people who use it, and Automattic is one of the largest forces keeping that true. Shipping into a GPL-licensed product is a meaningful difference from shipping into a closed proprietary stack — my own side projects sit on GitHub for the same reason. WooCommerce, WordPress.com, and Gutenberg all look like work I'd actually want to wake up and do. PHP isn't new for me — I shipped on ChronoTrack's CTLive web app (registration, scoring, results) and led a Laravel app as my senior project at CU Boulder, building a communication platform for the School of Engineering reporting to the Dean. Claude is already my daily collaborator, so the AI emphasis matches how I already work.\nTell us about a project or piece of work you’re especially proud of.\nThe Flutter mobile app for ChronoTrack's RFID timing hardware. Timers use it to configure scanners, capture and monitor reads, and transfer data to servers for scoring during races where reliability under bad network conditions is non-negotiable. I was lead developer and owned everything from architecture through App Store and Google Play releases.\nThe most consequential decision was scoping the hardware surface. The initial PM/leadership vision had us supporting BLE from any iOS or Android phone to a Bluetooth RFID scanner. Early in development I pushed to pivot the critical reads onto an embedded Android RFID scanner (AeroTrack) instead — same Flutter codebase, deeply feature-flagged. The general MobileTrack app stayed available on any phone with manual bib entry, which is enough for smaller races run by volunteers; the fully-featured version only ran on AeroTrack. That pulled BLE-on-arbitrary-hardware variability out of the critical path entirely, dropped long-term maintenance cost massively, and is the reason the system held up at events the scale of the New York and Boston Marathons.\nThe cross-platform Flutter call was the other interesting tradeoff. A single Dart codebase paid off given the small team and identical operator workflows, but it meant writing platform channels to bridge the native scanner SDKs and the Bluetooth stack — where the abstraction has real cost. State was modeled as reactive streams into the UI, which kept screens consistent even when the underlying transport flapped. Never regretted that call.\nHow has AI changed your work – if at all?\nToward the end of my time at ChronoTrack we integrated Claude into the workflow for code review and deep codebase analysis. My rule is to treat its output as a hypothesis to verify before shipping anything — I'd read every report, judge what was actually worth doing, and ship only the changes that held up. Where I reach for it: code review, generating tests, exploring unfamiliar libraries, surfacing optimization candidates I can verify. Where I don't: novel architecture decisions, anything where domain context is the real bottleneck rather than typing, and changes with enough blast radius that I want the full mental model before merging.\nThe clearest win from that workflow was AeroTrack's tag read pipeline. Pre-AI we were pulling scans off the hardware buffer one at a time and timestamping on the Flutter side, after crossing the platform channel. The optimization was to batch the reads and pull the timestamping into native Kotlin before crossing the channel. Sub-millisecond reduction per read sounds small until you're processing 10,000 reads in the buffer at New York Marathon scale. That made tag read timestamps the absolute source of truth for scoring under the heaviest loads.\nNot long after, my role as the last embedded software engineer at the company was eliminated — so you could say I was replaced by AI too. I'd been wearing the whole hardware-team hat by then; when I joined we were five-ish with an EM, QA, and fellow engineers, and post-COVID it was just me until the team fully dissolved.\nIn my time off I'm using AI daily to stay sharp, including a Sudoku game engine (github.com/jtraut/sudoku) I built AI-assisted as a deliberate showcase.\nWhat’s an idea, book, blog post, or talk that recently changed how you think about your craft?\nAddy Osmani's \"Conductors to Orchestrators: The Future of Agentic Coding\" (O'Reilly Radar, earlier this year — it cycled hard through my LinkedIn feed). The argument is that the engineering job is shifting from writing every line yourself to orchestrating multiple AI agents working in parallel: setting goals, defining specs, reviewing plans, integrating results. The humans hold the architectural picture and the quality bar; the keystrokes are getting outsourced.\nThe mental model that stuck for me is the artist, the paintbrush, and the canvas. The canvas — the finished product, polished and held to the same standard — hasn't changed. The paintbrush has. It used to be one stroke at a time; now it's a brush that takes the artist's vision and lays it down without the artist doing every individual stroke. You still have to know what you want, where it goes, and what's wrong when it comes out off — you're just not bottlenecked by the mechanics anymore.\nWhat changed in how I work: I plan more deliberately before I start, write specs and intent in plain language up front, and treat agent output as a draft to verify rather than a finished commit. Architectural calls and product-scoping tradeoffs (the BLE-versus-embedded-Android kind) I still make myself, because that's where the value is. Code that's mostly translation of a clear intent into syntax, I increasingly let an agent draft and then review hard. I'm operating one level higher up the abstraction stack than I was a year ago.\nWhat’s a controversial or unpopular opinion you hold about software engineering, and why?\nIn my interview at ChronoTrack I was asked about pair programming — they were deep into it as a practice. I told them I'm not a fan, and why.\nWhen I'm working through a complex, abstract problem, the last thing I need is someone watching over my shoulder. My brain starts splitting attention — what is this person thinking, should I be making small talk, what small talk — instead of staying on the problem. Quality of the output drops. After I've made a real iteration on a solution, I'll happily pull someone in to walk through tradeoffs, edge cases, and bugs. That's where collaboration actually compounds. Code review, pairing on specific tricky sections, async written feedback on a draft — welcome. Continuous live pairing as the default is what I push back on.\nLong story short, I got hired and the company removed pair programming from their practices not long after (and the team rejoiced).\nIs there anything else you’d like us to know?\nI lean into complex, abstract problems — they're the challenges that excite me and lead to the \"ah-ha\" moments that show up not at the desk but on a walk or in the middle of the night. Wracking your brain over something for hours, sometimes days, and finally landing the solution brings an almost childish level of excitement, usually accompanied by an audible \"HOORAH\" (PC-friendly version). It's a big part of why I gravitate toward full-stack and backend work, including embedded systems — the gnarlier the problem, the more interesting. That said, I've shipped polished frontend too (React.js, Flutter UI, Dart), and at ChronoTrack I went wherever the work was.\nThe other thing worth saying: I weight deep understanding of software engineering principles much higher than commitment to any one language. Once the concepts are solid, jumping between languages is mostly a syntax problem you can absorb quickly without needing to keep every detail memorized. I've leaned on that throughout my career — at Radiometrics I led the modernization of a legacy Fortran/C++ system into Go even though Go was new to the entire team, and at ChronoTrack the call to build the mobile app in Flutter was made knowing neither I nor the principal engineer I worked with had touched Dart before. Picking up something new (or shaking the rust off something old) is genuinely one of the parts of the job I enjoy most.\nWhat I want most is to keep being challenged. There's always more to learn in this field, and that's what keeps me in it.\nReturns: \"Instructions: Expected 'X-future' header with value 'automattician'\"\nReturns: {\"secret\":\"2026-05-09-56FEC8CBKP\"}\nWould you like to share any links to your work or relevant social media profiles?\nCan you tell us more about how you heard about this role?\nWay to make the list! I'll say it's been a refreshing take on the application process for sure.\nPlease indicate your salary expectation for this role.\n$160K+ base.", "status_label": "Applied", "column": "applied"}, {"id": "a28404c1a7", "company": "Jobtogether", "role": "Sr Embedded Engineer", "date": "11/07/2025", "salary": "", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4334543881/?refId=qKKoZEAxHqk24QbAeA1d2g%3D%3D&trackingId=Qd5AMXxsk%2B8GpuOZx46w9Q%3D%3D", "notes": "No salary range posted\nIoT wearables", "status_label": "Applied", "column": "applied"}, {"id": "ac7d649ca1", "company": "Hatch", "role": "Sr Embedded Engineer", "date": "1/27/2026", "salary": "", "location": "Remote", "link": "https://job-boards.greenhouse.io/hatchcareers/jobs/4639273006?gh_src=cab1f41d6us&source=LinkedIn", "notes": "Would be cool to work on a product promoting better sleep\nHas great reviews for being a good place to work", "status_label": "Applied", "column": "applied"}, {"id": "ad6ead2d77", "company": "Airbnb", "role": "Senior Software Engineer, Guest & Host", "date": "6/9/2026", "salary": "190-220K", "location": "Remote", "link": "https://careers.airbnb.com/positions/7639355/?gh_src=34ewj2", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "b474d4ffed", "company": "Curology", "role": "Sr Software Engineer", "date": "4/10/2026", "salary": "150-180K", "location": "Remote", "link": "https://www.linkedin.com/jobs/search/?currentJobId=4368051467&f_C=6622369&originToLandingJobPostings=4368051467&trk=d_flagship3_company", "notes": "Easy apply (SIKE)\nIncluded summary from resume (new) and also cover letter (requested)\nHow used AI tools in dev/product process before:\nYes, I worked with a team that would utilize Claude to generate analysis reports on our codebase based on open tickets or pull requests; which I would then review and assess the validity and implications of said reports and perform any follow up action items where necessary to continue to deliver the most efficient and reliable product. For example we had a singular endurance race timing product in field that experienced some ~seconds timestamp delays under very heavy load (NY Marathon) from the moment of tag detection to the moment of processing and timestamping, and we leveraged Claude to help detect some bottleneck areas in the system and I proceeded to refine our architecture and eliminate the delays before our next big race the following week.\nMicroservice-based platform worked on:\nI was the lead developer of a cross-platform mobile application built on the Flutter framework. Our architecture embraced microservices to the core. Every file had its own very specific purpose, with the UI side being broken into many different reusable components and screens; and the backend side playing into specific providers, utilities, and so on. Any data can be streamed from the appropriate provider. For example, if you need data on the current device info to make UI display or feature flag decisions, then you would simply access the DeviceInfoProvider class first. Or need to access the database, then use the DatabaseProvider class. The list goes on and on. This architectural decision made the app very modular, flexible, resilient, and scalable. New features were easy to add in, even at the request of a customer, they could see the desired functionality available in under a week with the rapid release cycles.", "status_label": "Applied", "column": "applied"}, {"id": "b5bada78af", "company": "Mozilla", "role": "Sr Software Engineer", "date": "5/11/2026", "salary": "", "location": "Remote", "link": "https://job-boards.greenhouse.io/mozilla/jobs/7743906", "notes": "", "status_label": "Rejected", "column": "rejected"}, {"id": "b674114f5e", "company": "Apple", "role": "Sr Software Engineer - Time Synchronization", "date": "3/16/2026", "salary": "132-244K", "location": "", "link": "https://jobs.apple.com/en-us/details/200641178-0365/sr-software-engineer-time-synchronization?board_id=JB001&rx_campaign=indeed0&rx_ch=jobp4p&rx_group=122365&rx_id=4a5ebeb0-1c3a-11f1-8590-dd9a7b1b5c70&rx_job=200641178-0365_rxr-662&rx_medium=cpc&rx_r=none&rx_source=indeed&rx_ts=20260316T163803Z&rx_vp=cpc&team=SFTWR&cid=aggregators_re+co_global_indeed_nationwide_organic&board_id=JB001&rx_p=B210P3E9LY", "notes": "Boulder, CO", "status_label": "Applied", "column": "applied"}, {"id": "b67c29c6df", "company": "Dragos", "role": "Senior Software Engineer", "date": "6/10/26", "salary": "165K", "location": "Remote", "link": "https://job-boards.greenhouse.io/dragos/jobs/5073929008?gh_src=12ba0d018us", "notes": "CI/CD work:\nThe CI/CD workflow I worked with most at ChronoTrack was the GitLab CI pipeline for our Pro2 codebase. Caveat: I extended and maintained it across several major refactors rather than scaffolding it from scratch.\nWhat it did: every push ran the full Pro2 test suite, which gated all downstream steps. If any test errored or failed, the pipeline halted and produced no artifact. If the suite passed cleanly, it automatically built and signed our release artifacts (.jar.gpg for Pro2 controllers, .upg cap files for MiniTrack). Those artifacts were the source of truth for QA pulling builds for testing, support pulling for hotfix delivery, and DevOps publishing production releases to our customer-facing portal.\nAutomated tasks: test suite execution as the gate, build packaging into the .jar.gpg and .upg cap formats, artifact signing, and publication to the internal artifact store other teams pulled from.\nMy ongoing role was keeping the pipeline running cleanly through codebase changes: updating test infrastructure as coverage shifted, the signing flow when certificate expectations changed, and packaging steps when output formats or directory structures changed.\nCybersecurity work:\nNo direct industry experience. My security-adjacent technical work has been around signed build artifacts (.jar.gpg) plus Keycloak as our IAM/auth layer. Outside of work, I have read Penetration Testing: A Hands-On Introduction to Hacking (Weidman) and Ghost in the Wires (Mitnick) out of interest in the field.", "status_label": "Applied", "column": "applied"}, {"id": "b6b3513e82", "company": "The Voleon Group", "role": "Sr Software Engineer, Platform Team", "date": "3/19/2026", "salary": "225-255K", "location": "Remote", "link": "https://www.linkedin.com/jobs/collections/remote-jobs/?currentJobId=4386573666&discover=recommended&discoveryOrigin=JOBS_HOME_JYMBII", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "ba297362eb", "company": "Reddit", "role": "Sr Software Engineer, Compute Platform", "date": "6/1/2026", "salary": "$190-267K", "location": "Remote", "link": "https://job-boards.greenhouse.io/reddit/jobs/7902277", "notes": "Bit of a stretch but yolo", "status_label": "Applied", "column": "applied"}, {"id": "bd2855e95e", "company": "Medtronic", "role": "Sr Firmware Engineer", "date": "4/28/2025", "salary": "108-163K", "location": "", "link": "", "notes": "Lafayette CO, on site", "status_label": "Applied", "column": "applied"}, {"id": "c100692f44", "company": "SourceGraph", "role": "Software Engineer - Code Understanding IC2", "date": "6/5/2026", "salary": "128-190K", "location": "Remote", "link": "https://job-boards.greenhouse.io/sourcegraph91/jobs/5855148004", "notes": "How did find:\ngithub.com/poteto/hiring-without-whiteboards. I came across the role there while looking for companies with humane interview processes, and Sourcegraph stood out for both the engineering culture and the Code Understanding product.\nWhy good fit:\nThree reasons. IC by intent: seven years owning ChronoTrack's timing hardware product line end-to-end, turned down a move into engineering management to keep the IC seat. End-to-end ownership and autonomy: accountable across architecture, C++ controller code, cloud, and customer-facing behavior with no internal handoffs. Async-first remote: ChronoTrack was fully distributed across timezones; written documentation and PR-driven discussion are my default, and I use Claude and Claude Code daily. Stack-wise, Go, React/JS, Postgres/Linux/bash/Docker are comfortable ground; TypeScript and GraphQL are ramp areas.\nWhy SourceGraph?\nCode understanding has become the tooling I reach for most days, and shipping it rather than just using it is a rare opportunity. The public handbook, open pay bands, and explicit value on agentic coding tools (with ownership of the output) line up with how I already operate. And finding Sourcegraph on the whiteboard-free hiring list signaled you take candidate experience as seriously as the work.\nComp target:\nZone 1. Targeting the upper portion of the IC2 band given my experience (~$180K+), with openness to discussion on leveling if my profile sizes higher.", "status_label": "Applied", "column": "applied"}, {"id": "c239c0a8f8", "company": "Jobgether", "role": "Sr Embedded Engineer", "date": "12/18/2025", "salary": "135-175K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4342847135/?refId=98uKapumTQG8neDgQ%2ByrAw%3D%3D&trackingId=JMwOBA2ATBGEoes20Wu7NQ%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "c3841583de", "company": "Amazon", "role": "Software Engineer  - NO (hungover bombed assessment…)", "date": "5/8/2025", "salary": "129-224K", "location": "", "link": "https://www.amazon.jobs/jobs/2907110", "notes": "Denver, CO", "status_label": "Applied", "column": "applied"}, {"id": "c8070d23cd", "company": "XpertDirect", "role": "Sr Embedded Engineer", "date": "1/27/2026", "salary": "", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4353938717/?eBP=CwEAAAGcAfuH86hk5CAtQsea6LtahyNf7veEmsHWXem409wLNDBydfu5zwzIdcugYwozxlaRjq17_JZzlZ9ahhfLTPMLEoUghNvrL7DeBAxk_5L8AAgSQJ1mIcgp69h9PE3io5IzlCssbP9dGHQhrtUwjoDD0G7SHuAMBy4VpLJnyrDG4r1IdsxgV3nSygJl8LkpMFiprIJnuvJinj9Xk4tfYY7UR4SBAEgsdaN3qV6V7N0sMsq1GAXqDKdLNOE-ElTlbgLJw-kQ7136Jm1dKsgMZ6tvNnhCbdUhzt6RzPH19FvXCYuKMiJdSUK5CW8amLyYMPjniF7dJ7AgpBvylAigGypXdT8Q_VkLePIdTiJ-ptKZEf-nInBXTtRk_pI0PppJ5MmVdcQUsoIvC4ZThB24Goj5yRfjftnMeZL-FK8rqpPmt4wVdyDaNXQhRs4N9RQVcsNSeSpMqRZ0UwMTZcu03d8YpR63lvf9cFnMoN_QcnQKdhH0gIxnTMSwgi-Jk9BBPODeeIF-&refId=NuwkrzC1MSBSQldlzCfyuw%3D%3D&trackingId=klrw5yNKfArX%2FrUha6sr%2BA%3D%3D&trk=flagship3_jobs_discovery_jymbii&lipi=urn%3Ali%3Apage%3Ad_flagship3_jobs_discovery_jymbii%3BCzKWhEr9Rniej92mnoICAA%3D%3D&lici=klrw5yNKfArX%2FrUha6sr%2BA%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "c871126c10", "company": "Emporia", "role": "Sr Firmware Engineer  - NO (few interviews)", "date": "4/4/2025", "salary": "130-160K", "location": "Boulder, onsite", "link": "", "notes": "", "status_label": "Rejected (after interview)", "column": "rejected"}, {"id": "cd3de24eb1", "company": "NVIDIA", "role": "Sr Embedded Systems Engineer AV", "date": "1/27/2026", "salary": "184-356.6K", "location": "Remote", "link": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-CA-Santa-Clara/Senior-Embedded-System-Software-Engineer---Hypervisor-and-RTOS_JR2011612?source=jobboardlinkedin", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "ce6e6c2aca", "company": "CyberCoders", "role": "Sr Embedded Engineer", "date": "4/16/2025", "salary": "150-170K", "location": "Remote", "link": "", "notes": "REMOTE", "status_label": "Applied", "column": "applied"}, {"id": "d00d34d801", "company": "Gametime", "role": "Sr Full Stack Engineer", "date": "4/17/2026", "salary": "187-220K", "location": "Remote", "link": "https://job-boards.greenhouse.io/gametimeunited/jobs/5105408008", "notes": "Tailored resume and cover letter", "status_label": "Applied", "column": "applied"}, {"id": "d9f15eb9b1", "company": "Propel", "role": "Sr Full Stack Engineer", "date": "4/29/2026", "salary": "170-240K", "location": "Remote", "link": "https://jobs.ashbyhq.com/propel/d0e96770-a073-4d53-88b6-586d74db35e8?departmentId=76454638-419c-42cf-839a-e1d5b12247b8", "notes": "What interests you in joining the Propel team?\nPropel's mission genuinely resonates with me — building technology that makes navigating government benefits feel as seamless as any modern consumer app is meaningful, unglamorous work that actually matters to people's lives. Beyond the mission, what draws me is the way Propel operates: a remote-first, high-ownership culture where engineers are trusted to think deeply, move fast, and take real accountability for what they ship. I thrive in that kind of environment — I've spent years as the sole technical owner of production systems where there was no one else to hand the problem to, and I find that kind of autonomy genuinely energizing rather than stressful. The scale is also compelling: building products used by millions of real Americans, where a poorly designed flow or a slow API endpoint has tangible consequences for someone's ability to access food or healthcare benefits, is exactly the kind of stakes that keeps engineering work meaningful.\nTell us about a recent project where you had to be scrappy.\nThe best example is MobileTrack — a cross-platform mobile app I took from concept to production for ChronoTrack. It was my first production mobile app and my first time using Dart/Flutter, so scrappiness was baked in from day one.\nThe original plan was to integrate with RFID scanners over Bluetooth (BLE) so the app would work across any device. I built a POC and quickly hit the wall — the BLE integration was fragile, the surface area of devices and OS versions to support was enormous, and the long-term maintenance burden would have been unsustainable for a team of one. I made the call to pivot: instead of universal BLE support, I targeted Android-embedded RFID scanners specifically. This meant the full-featured version of the app was tied to dedicated hardware the company sold, but it completely eliminated the cross-device compatibility problem and let me ship something reliable. The app still runs on any device for manual bib entry, so we didn't lose coverage — we just separated the two use cases cleanly.\nThe team was tight: me as sole developer after the initial POC phase, a designer, a product manager, and our company's Principal Engineer who helped me get to POC before handing it off. I kept the Founder and President looped in at key milestones. For the initial release I made a deliberate tradeoff: I prioritized core functionality — race setup, time sync across deployed hardware, real-time RFID bib reads, and streaming tag reads to backend servers — and accepted a rougher UI to hit the deadline. The app worked exactly as it needed to on day one. I then went back and did a full UI facelift in a follow-up release, working iteratively with the designer. Shipping something functional before shipping something polished was the right call, and it's a tradeoff I'd make again.\nWalk us through how you’d use AI tools when implementing a feature on a tight deadline\nAI tools are most useful to me as a force multiplier on the parts of a feature that are high-volume and low-risk — boilerplate, scaffolding, test stubs, first drafts of things I'd write the same way every time anyway. The places I slow down and stay in control are the parts that actually determine whether a feature is correct and maintainable.\nIn practice, here's how I'd move: I start by writing the design myself — the shape of the API contract, the data model, the edge cases I already know about — before touching any AI tooling. That thinking is mine and it needs to be, because if I outsource the design I won't own it later when something breaks. Once I have a clear spec in my head, I'll use AI to generate the skeleton: the endpoint handler, the serialization layer, the initial test file. I read everything it produces before using it. I'm specifically looking for hidden assumptions, missing error handling, and anything that looks superficially correct but doesn't actually match the contract I defined.\nFor tests, I'll use AI to generate the happy path and obvious edge cases quickly, but I write the tests for the edge cases I care about most myself — the ones that would cause real user harm if they failed silently. Those are too important to trust to pattern-matching on my codebase.\nOn a tight deadline, the trap with AI tools is that they make it very easy to generate a lot of code quickly that you don't fully understand. That's where technical debt compounds fastest. My rule is simple: I don't commit code I can't explain and defend in a review. If AI produced something I'm not sure about, I take the 10 minutes to understand it or rewrite it myself. Speed on a deadline comes from not having to untangle confusing code two weeks later.", "status_label": "Applied", "column": "applied"}, {"id": "dc0cf22103", "company": "ElevenLabs", "role": "Full-stack Software Engineer II (Backend leaning)", "date": "3/30/2026", "salary": "", "location": "Remote", "link": "https://www.glassdoor.com/partner/jobListing.htm?pos=104&ao=1136043&s=58&guid=0000019d3fcfd503b7aac55de8bc72d6&src=GD_JOB_AD&t=SR&vt=w&uido=14853B48013974930A8F4B71BFD429F5&cs=1_608f26e4&cb=1774892078631&jobListingId=1009928446955&jrtk=5-yul1-0-1jkvsvl9sk8hk800-f3abe14b1e5aaf52", "notes": "What makes you excited about the mission\nThe opportunity to work on such a high impact product can be very rewarding, especially being in the AI space and the challenges that come with that. I know there would be a lot to learn on the job, and that excites me very much.\nHard problem in past\nI was tasked with developing a state of the art timing product to be deployed at endurance races around the world. The goal was to create a new hardware product that can uphold the same trusted accuracy and reliability of its predecessors yet at a fraction of the cost and size; making it much more accessible and easily deployed in field. The resulting product was a mobile application (ChronoTrack MobileTrack) available on iOS and Android that also has the ability to pair with a handheld RFID scanner to detect and record athletes on course. I led the development effort in the tech stack and architecture decisions, even making the recommendation to pivot on the underlying hardware pairing selection to help save major costs in support and maintainability. Despite it being my first production mobile application, and working on a very small team as the lead developer, the product was very well received and sold tremendously, now with hundreds in use every weekend at races around the globe.", "status_label": "Rejected", "column": "rejected"}, {"id": "df4aef46b9", "company": "Canonical (Ubuntu)", "role": "Embedded Linux Senior Software Engineer, Optimisations", "date": "5/19/2026", "salary": "", "location": "Remote", "link": "https://canonical.com/careers/6189337", "notes": "Embedded resume & cover letter\nWhich modern Linux/Ubuntu middleware and software stacks are you comfortable developing in, or working with? Please describe.\nDocker and Kubernetes for deployment, Apache Kafka for event streaming, NGINX in front of our web and server applications, Keycloak for IAM/auth, and Redis for caching at ChronoTrack; RabbitMQ for microservices. Languages: C++ across the embedded firmware, Go on the Radiometrics backend, and Python/Bash where they made sense. Kafka and C++ I have used heavily; Docker, Kubernetes, Redis, NGINX, RabbitMQ, and Keycloak I would call working familiarity.\nPlease describe your experience of Ubuntu or Debian packaging and packaging policy.\nHave not published any or worked at the policy level. Hands-on usage was pulling .deb packages into our timing controller image (.jar.gpg) so customers could install updates over a USB upgrade path with no network needed.\nPlease describe your experience leading open source projects or contributing to existing projects.\nNo upstream contributions yet. I have used and patched open source locally (Linux, Chrony, NetworkManager), and contributing back upstream is part of why this role at Canonical appeals to me.\nCollege Degree Result:\nGPA 3.612/4.0\nPlease share your rationale or evidence for the high school performance selections above. (top 5% math, 20% english). Make reference to provincial, state or nation-wide scoring systems, rankings, or recognition awards, or to competitive or selective college entrance results such as SAT or ACT scores. Etc…\nCalifornia-based, referenced against US standards. Math was the stronger of the two: A's in honors-track courses through AP Calculus, where my (tenured) teacher told me I was the first A+ he had ever given in the course. I set the curve on essentially every test, often scoring above 100% because he offered an extra-credit challenge question that I would also solve. I scored a 5/5 on the AP Calculus exam. English: A's in honors-track courses, but math was clearly out in front, which is why I picked the wider top-20% range there.", "status_label": "Applied", "column": "applied"}, {"id": "e46f39b26f", "company": "Samsara", "role": "Sr Mobile Software Engineer - BLE / Connectivity", "date": "11/13/2025", "salary": "150-252.5K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4339986558/?trackingId=%2BtQpE0j8TUyKuacncrgpuQ%3D%3D&refId=Qisywb2WQkOwXalI5lN4Yw%3D%3D&midToken=AQGO1J-9xBLV9A&midSig=370pDOWvaInI01&trk=eml-jobs_jymbii_digest-job_card-0-jobcard_body&trkEmail=eml-jobs_jymbii_digest-job_card-0-jobcard_body-null-4wgl8m~mhxthrks~en-null-null&eid=4wgl8m-mhxthrks-en&otpToken=MTAwYzE4ZTMxYTI4Y2RjN2JjMjQwNGVkNDAxZGU3YjI4ZWM2ZDc0NDlhYWI4YjYxNzZjMDA0NmU0NjVkNWNmMmY2ZGY4Zjg1NGZmM2I4YzI2MGY4MjExZTdhMTJiNDdjZjAwYzFmMDE3NjYyMmJlOTJiYzcsMSwx", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "e714161545", "company": "Netflix", "role": "Systems Software Engineer L4", "date": "4/16/2025", "salary": "100-620K (LOL)", "location": "Remote", "link": "", "notes": "REMOTE", "status_label": "Applied", "column": "applied"}, {"id": "e806566896", "company": "Cedar", "role": "Sr Software Engineer (Data Acquisition)", "date": "3/24/2026", "salary": "195.5-247K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4372744165/?eBP=CwEAAAGdB4a27hF0MqwZWa-z6MJ9r9y8p9IesK3y0TDCqcJkA69pZ4bfPjOHjX4qBN7sCCxFIk7OFGxNiqJgV2MDIhRaY9UqK8NkwnxcTC8wjZuS0HCsfFRYHFnu7V4kdUo3t1TgC2VvLzbY3iWqbgwmvebdMlHZj6wG13lQVhB-QG3EsYmf0kDJcA1b0klSnKi_qVrLT1JfXIMRA1kLdqxojhLF_5AQOwv41qBfM7bR31E8aWFwZqzc8clEz2krssKxUymTU0mII47Hh7SwJuMJJhIv93ysvPUb6hpVBPZvzexc8UrrZAfhOR3oooemplMkgplclf69rHEwHm3cduNjl_cIm9xixtGnjYVNALkNTVnhUnHyHBZcdI6B5pdPiq1d_pHcpFG0uy9k9fmU8n5YhZ2-6UlZKnAHIoYWZystqxLLHVHYZsIHLhy21FbMaZUW0EkYrguOFTqDRTBKG_r-hQ4sNA9U8oegClspT5BB6Pproj7Ax6WBqj7dapRkdpxzZFE0fUIa3LAijjg-oBbcPfD5MgqahOMqk7ZtVgRELSqVGlY&trk=flagship3_job_collections_leaf_page&refId=vgfOJ69u6wvCxCZwxXusOQ%3D%3D&trackingId=CbqN8B1EzLlhTvBkgA8V7w%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "e89aa8931c", "company": "Motive", "role": "Sr Embedded IoT Engineer", "date": "11/13/2025", "salary": "126-193K", "location": "Remote (SF based)", "link": "https://www.linkedin.com/jobs/view/4315413799/?trackingId=bfSluLfYQOeVlzdRZhqofQ%3D%3D&refId=rKAgBkKWS0aT4q2Yvh4eZw%3D%3D&midToken=AQGO1J-9xBLV9A&midSig=370pDOWvaInI01&trk=eml-jobs_jymbii_digest-job_card-0-jobcard_body&trkEmail=eml-jobs_jymbii_digest-job_card-0-jobcard_body-null-4wgl8m~mhxthrks~en-null-null&eid=4wgl8m-mhxthrks-en&otpToken=MTAwYzE4ZTMxYTI4Y2RjN2JjMjQwNGVkNDAxZGU3YjI4ZWM2ZDc0NDlhYWI4YjYxNzZjMDA0NmU0NjVkNWNmMmY2ZGY4Zjg1NGZmM2I4YzI2MGY4MjExZTdhMTJiNDdjZjAwYzFmMDE3NjYyMmJlOTJiYzcsMSwx", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "ea608efd72", "company": "Outlier", "role": "Full Stack Engineer, AI Trainer", "date": "4/2/2026", "salary": "", "location": "Remote / Contract / Flexible work hours", "link": "http://url9405.outlier.ai/ls/click?upn=u001.ekXzrh6HTgOsQrpQbkIFH1gpufYUDgN8PE5rkYYYxSqZQrriCCBU6bQjemL5Lpz-2FmA65jNT7SyH9s6I5Xuz4TvBA-2FvmI6VzjX-2BgrkjXC2xn5NL2D-2FycVJqGQiuxwf1wStfEyNOM1JTIeJ9qgrkOdwA-3D-3DQygk_4HzC96CWh9wNt6G2wxo9t-2F57byyzugmcIpJXykGCGkjMWrkqnDIuoNH5X11uMjsLPrGxs1FUzmReUglkxFjVz1Qv-2FoMmO4kyR2UzyuazI40zbHgLp5XURoX9lSa1tmOstt7IXMvzTmI6RGJXQaH-2FsujTQx4zJ3DvQuf2jJkOKTAitLw-2BeBrU4AJd0hH-2FQImIUZcfGza29R72oeJaa52tDzU23LOY5Dyy0KC9DycbPLaPIGw-2FVnz7UQk2Zyyg66AeuCZ2xRFkEr3qigoBTKKXCcOBa8NaSUGOY3Y5PQnR4Q6BMqY9-2F4ZqKUIU2pqtIICtECaKuebczlnbahUItiATcQ-3D-3D", "notes": "50/hr (maybe can negotiate more?)\nNEED TO TAKE THE SCREENING TECHNICAL TEST (on laptop with camera/microphone)\nPASSED SCREENING, NOW HAVE WORK AVAILALBE!!!\nNeed to input my payment info though", "status_label": "Applied", "column": "applied"}, {"id": "ec75dd6666", "company": "Infleqtion", "role": "Sr Embedded Software Engineer", "date": "9/9/2025", "salary": "131-175K", "location": "Boulder, CO (hybrid)", "link": "https://www.linkedin.com/jobs/view/4293142636/?eBP=NOT_ELIGIBLE_FOR_CHARGING&refId=BoaUKBGkhRsrDAH4ocpvJw%3D%3D&trackingId=ssB0ipZ4LKuDLBIDF3dZkQ%3D%3D&trk=flagship3_jobs_discovery_jymbii&lipi=urn%3Ali%3Apage%3Ad_flagship3_jobs_discovery_jymbii%3BCIc9l15sQQGbzQyQXyTmQw%3D%3D&lici=ssB0ipZ4LKuDLBIDF3dZkQ%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "ed3675d222", "company": "Pinecone", "role": "Sr Software Engineer - Knowledge Engine", "date": "3/17/2026", "salary": "180-220K", "location": "Remote", "link": "https://www.pinecone.io/careers/773e953d-8f53-4313-93b4-35a553bad1cb/", "notes": "Keith Corbalis is an Engineering Manager there!\nNOW have a new job posting that appears a better fit\nKeith posted on LinkedIn they are hiring\nSo seeing if can get a referral", "status_label": "Saved", "column": "saved"}, {"id": "efc3801d17", "company": "Handshake AI", "role": "Software Engineering Talent Network - Project Helix", "date": "4/14/2026", "salary": "", "location": "", "link": "https://ai.joinhandshake.com/fellow/forms/8858c724-601c-45d0-b111-6010a63780ff", "notes": "Rejected after the online assessment… which thought did well on (⅚ questions)\nSkipped one written response to get to the coding assessment\n$65/hr\nAPPROVED, ONBOARDING TODAY\nProject Helix Terms At A Glance\nStart date: 04/12/2026\nEstimated end date: 05/10/2026\nLocation requirement: All work must be completed from within the United States and its territories or Canada.\nTime commitment: Minimum: No minimum number of hours. Maximum: No maximum number of hours.\nPay rate: $20/hour, plus an additional $350 for each accepted task\nMaximum handling time per task: None\nTask cap (number of tasks that can be worked on concurrently): 2\nAdditional payments: $100 bonus for the first accepted task for fellows who are new to the project after 4/12/2026\nPayment timing: Typically issued weekly on Wednesday for the previous week’s work.\nTask Quality, Submission and Acceptance: You will be paid for each accepted task. A task is accepted when it is successfully validated by Pass@ and successfully induces a model failure.\nHandshake may, in its sole discretion, remove you from the Project or the Program if your submitted tasks repeatedly fail validation by Pass@ and do not induce a model failure.\nAdditional Payment Terms: Payment timing: Handshake reserves the right to adjust the payment schedule as needed and will notify you of any change.\nOther payments: Any incentives, bonuses or additional stipends will be earned and paid according to the terms shared by the Project Lead.\nWithholding of Payment by Handshake: Handshake reserves the right to withhold payment if your account is temporarily deactivated or permanently deactivated on the basis of a Material Breach or Violation of your Contractor Agreement.\nHandshake may modify these Project Terms at any time.", "status_label": "Rejected (after assessment)", "column": "rejected"}, {"id": "f4faa62607", "company": "Flock Safety", "role": "Firmware Engineer III Linux/AOSP", "date": "2/2/2026", "salary": "140-160K", "location": "Remote", "link": "https://jobs.ashbyhq.com/Flock%20Safety/0b1870c1-7f3b-4cb2-b398-39cfdd1cf690?utm_source=53ANrgQzgE", "notes": "Security stuff (crime prevention, law enforcement etc)", "status_label": "Applied", "column": "applied"}, {"id": "f648a9e608", "company": "Serve Robotics", "role": "Sr Embedded Software Engineer", "date": "9/16/2025", "salary": "150-200K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4297727911/?refId=Bhtec27aZI5VrI9djVoX%2BA%3D%3D&trackingId=h7m0Ki5P2VlnJ2xlviqVTA%3D%3D", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "f795d6676a", "company": "Red", "role": "Sr Embedded Engineer", "date": "6/30/2025", "salary": "170-200K", "location": "", "link": "https://www.glassdoor.com/job-listing/senior-embedded-software-engineer-red-6-JV_IC1148119_KO0,33_KE34,39.htm?jl=1009792536515&utm_source=jobalert&utm_medium=email&utm_term=jac2jvar&utm_content=ja-jobpos1-1009792536515&utm_campaign=jobAlertAlert&tgt=GD_JOB_VIEW&src=GD_JOB_AD&uido=14853B48013974930A8F4B71BFD429F5&ao=1136043&jrtk=5-yul1-0-1iuuuq955k3fp800-c694814044c27c36&cs=1_c6e1aeed&s=224&t=JA&pos=101&ja=333327838&guid=00000197bdecafd186aa839c26b48d4c&jobListingId=1009792536515&ea=1&vt=e&cb=1751238125543&ctt=1751310298044&srs=EMAIL_JOB_ALERT", "notes": "Lousiville, CO (in office)", "status_label": "Applied", "column": "applied"}, {"id": "f8d696daa3", "company": "Microsoft", "role": "Sr Software Engineer - Gaming", "date": "12/18/2025", "salary": "120-158K", "location": "Remote", "link": "https://www.linkedin.com/jobs/view/4344422440/?trackingId=XX7eEaj0RO6vqD3YU5cDwA%3D%3D&refId=wquyjavcSoyh2YtZWQ9jxg%3D%3D&midToken=AQGO1J-9xBLV9A&midSig=3fSlodd4id8Y41&trk=eml-jobs_jymbii_digest-job_card-0-jobcard_body&trkEmail=eml-jobs_jymbii_digest-job_card-0-jobcard_body-null-4wgl8m~mjbtwkvu~jm-null-null&eid=4wgl8m-mjbtwkvu-jm&otpToken=MTAwYzE4ZTMxYTI4Y2RjN2JjMjQwNGVkNDAxOGU3YmM4YWM3ZDE0MDk4YWY4NzYxNzZjMDA0NmU0NjVkNWNmMmY2ZGY4M2EzNjhkN2ViZTQ2Mjg2NzQ3MDFhZTU2YjVmMDA0YjViMGRiMmNkOGFmYmE0MGUsMSwx", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "fa8ab67458", "company": "Netflix", "role": "Software Engineer 4, N-Tech Systems Engineering", "date": "4/15/2026", "salary": "250-413K", "location": "Remote", "link": "https://www.indeed.com/viewjob?jk=e6f1255eb58fff40&tk=1jm8l9op4h7q6801&from=jobi2a_multijob-reactivation-en-US_email&xpse=SoBr67I3kJNTd2xQGh0LbzkdCdPP&xfps=b3c73be0-c8f8-4bce-bbca-ba1f4d8e590c&xkcb=SoCW67M3kIio-4Wo9x0IbzkdCdPP", "notes": "", "status_label": "Applied", "column": "applied"}, {"id": "fe0b160065", "company": "Utilidata", "role": "Embedded Linux Engineer", "date": "4/24/2025", "salary": "155-185K", "location": "Remote", "link": "", "notes": "REMOTE", "status_label": "Rejected", "column": "rejected"}];
+const STORAGE_KEY = 'job-hunt-tracker-v1';
+let state = { overrides: {}, columnOrder: {}, edits: {}, additions: [], deletions: {} };
+try {
+  const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  state = Object.assign(state, stored);
+  state.overrides = state.overrides || {};
+  state.columnOrder = state.columnOrder || {};
+  state.edits = state.edits || {};
+  state.additions = state.additions || [];
+  state.deletions = state.deletions || {};
+} catch (e) {}
+
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function uid() { return 'u-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function liveCards() {
+  const out = [];
+  for (const c of ORIGINAL_CARDS) {
+    if (state.deletions[c.id]) continue;
+    const edited = state.edits[c.id] || {};
+    out.push(Object.assign({}, c, edited, { _isUserAdded: false }));
+  }
+  for (const c of state.additions) {
+    out.push(Object.assign({}, c, { _isUserAdded: true }));
+  }
+  return out;
+}
+
+function getColumn(card) { return state.overrides[card.id] || card.column; }
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+function getDragAfterElement(container, y) {
+  const cards = Array.from(container.querySelectorAll('.card:not(.dragging)'));
+  let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+  for (const child of cards) {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) closest = { offset, element: child };
+  }
+  return closest.element;
+}
+
+function parseDate(d) {
+  if (!d) return 0;
+  const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return 0;
+  let yr = parseInt(m[3], 10);
+  if (yr < 100) yr += 2000;
+  return new Date(yr, parseInt(m[1], 10) - 1, parseInt(m[2], 10)).getTime();
+}
+
+function renderCard(card, colColor) {
+  const div = document.createElement('div');
+  div.className = 'card';
+  if (card._isUserAdded) div.classList.add('user-added');
+  else if (state.edits[card.id]) div.classList.add('user-edited');
+  div.draggable = true;
+  div.dataset.cardId = card.id;
+  div.style.setProperty('--accent', colColor);
+
+  const link = card.link
+    ? '<a href="' + escapeHtml(card.link) + '" target="_blank" rel="noopener">Open</a>'
+    : '';
+  const notesBtn = card.notes ? '<button onclick="toggleNotes(this)">Notes</button>' : '';
+  const editBtn = '<button class="edit-btn" onclick="openModal(\'edit\',\'' + card.id + '\')">Edit</button>';
+
+  const meta = [];
+  if (card.date) meta.push('<span class="chip date">' + escapeHtml(card.date) + '</span>');
+  if (card.salary) meta.push('<span class="chip salary">' + escapeHtml(card.salary) + '</span>');
+  if (card.location) meta.push('<span class="chip location">' + escapeHtml(card.location) + '</span>');
+
+  div.innerHTML =
+    '<div class="card-company">' + escapeHtml(card.company) + '</div>' +
+    (card.role ? '<div class="card-role">' + escapeHtml(card.role) + '</div>' : '') +
+    (meta.length ? '<div class="card-meta">' + meta.join('') + '</div>' : '') +
+    '<div class="card-actions">' + link + notesBtn + editBtn + '</div>' +
+    (card.notes ? '<div class="card-notes">' + escapeHtml(card.notes) + '</div>' : '');
+
+  div.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', card.id);
+    e.dataTransfer.effectAllowed = 'move';
+    div.classList.add('dragging');
+  });
+  div.addEventListener('dragend', () => div.classList.remove('dragging'));
+  return div;
+}
+
+function toggleNotes(btn) { btn.closest('.card').classList.toggle('expanded'); }
+
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  const cards = liveCards();
+  const cardById = Object.fromEntries(cards.map(c => [c.id, c]));
+
+  const byColumn = {};
+  COLUMNS.forEach(c => byColumn[c.id] = []);
+  cards.forEach(card => {
+    const col = getColumn(card);
+    (byColumn[col] || byColumn.applied).push(card);
+  });
+
+  COLUMNS.forEach(c => {
+    const explicit = state.columnOrder[c.id] || [];
+    const explicitSet = new Set(explicit);
+    const ordered = [];
+    explicit.forEach(id => {
+      const card = cardById[id];
+      if (card && getColumn(card) === c.id) ordered.push(card);
+    });
+    const remaining = byColumn[c.id]
+      .filter(card => !explicitSet.has(card.id))
+      .sort((a, b) => parseDate(b.date) - parseDate(a.date));
+    byColumn[c.id] = ordered.concat(remaining);
+  });
+
+  COLUMNS.forEach(c => {
+    const colDiv = document.createElement('div');
+    colDiv.className = 'column';
+    colDiv.dataset.columnId = c.id;
+    colDiv.innerHTML =
+      '<div class="column-header">' +
+        '<span class="column-dot" style="background:' + c.color + '"></span>' +
+        '<span class="column-title">' + c.name + '</span>' +
+        '<span class="column-count">' + byColumn[c.id].length + '</span>' +
+      '</div>' +
+      '<div class="column-desc">' + c.desc + '</div>' +
+      '<div class="card-list"></div>';
+    const list = colDiv.querySelector('.card-list');
+
+    if (byColumn[c.id].length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Drag cards here';
+      list.appendChild(empty);
+    } else {
+      byColumn[c.id].forEach(card => list.appendChild(renderCard(card, c.color)));
+    }
+
+    list.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      list.classList.add('drag-over');
+      const dragging = document.querySelector('.card.dragging');
+      if (!dragging) return;
+      const afterEl = getDragAfterElement(list, e.clientY);
+      if (afterEl == null) list.appendChild(dragging);
+      else if (afterEl !== dragging) list.insertBefore(dragging, afterEl);
+    });
+    list.addEventListener('dragleave', e => {
+      if (e.target === list) list.classList.remove('drag-over');
+    });
+    list.addEventListener('drop', e => {
+      e.preventDefault();
+      list.classList.remove('drag-over');
+      const cardId = e.dataTransfer.getData('text/plain');
+      if (!cardId) return;
+      state.overrides[cardId] = c.id;
+      const ids = Array.from(list.querySelectorAll('.card')).map(el => el.dataset.cardId);
+      state.columnOrder[c.id] = ids;
+      saveState();
+      render();
+      applySearch();
+    });
+
+    board.appendChild(colDiv);
+  });
+
+  const total = cards.length;
+  const inApplied = byColumn.applied.length;
+  const inInterview = byColumn.interview.length;
+  const inOffer = byColumn.offer.length;
+  document.getElementById('stats').textContent =
+    total + ' apps - ' + inApplied + ' pending - ' + inInterview + ' interviewing - ' + inOffer + ' offers';
+}
+
+function applySearch() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const cards = liveCards();
+  document.querySelectorAll('.card').forEach(cDiv => {
+    if (!q) { cDiv.classList.remove('hidden', 'match-highlight'); return; }
+    const id = cDiv.dataset.cardId;
+    const card = cards.find(x => x.id === id);
+    if (!card) return;
+    const hay = (card.company + ' ' + card.role + ' ' + card.notes + ' ' + card.salary + ' ' + card.location).toLowerCase();
+    if (hay.includes(q)) { cDiv.classList.remove('hidden'); cDiv.classList.add('match-highlight'); }
+    else { cDiv.classList.add('hidden'); cDiv.classList.remove('match-highlight'); }
+  });
+}
+
+let modalMode = 'new';
+let modalCardId = null;
+
+function populateColumnSelect(selectedColumn) {
+  const select = document.getElementById('f-column');
+  select.innerHTML = '';
+  COLUMNS.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    if (c.id === selectedColumn) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+function openModal(mode, cardId) {
+  modalMode = mode;
+  modalCardId = cardId || null;
+  const title = document.getElementById('modal-title');
+  const deleteBtn = document.getElementById('modal-delete-btn');
+
+  if (mode === 'edit') {
+    const card = liveCards().find(c => c.id === cardId);
+    if (!card) return;
+    title.textContent = 'Edit: ' + card.company;
+    document.getElementById('f-company').value = card.company || '';
+    document.getElementById('f-role').value = card.role || '';
+    document.getElementById('f-date').value = card.date || '';
+    document.getElementById('f-salary').value = card.salary || '';
+    document.getElementById('f-location').value = card.location || '';
+    document.getElementById('f-link').value = card.link || '';
+    document.getElementById('f-notes').value = card.notes || '';
+    populateColumnSelect(getColumn(card));
+    deleteBtn.classList.remove('hidden');
+  } else {
+    title.textContent = 'New application';
+    ['f-company','f-role','f-date','f-salary','f-location','f-link','f-notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    populateColumnSelect('saved');
+    deleteBtn.classList.add('hidden');
+  }
+  document.getElementById('modal-backdrop').classList.add('open');
+  setTimeout(() => document.getElementById('f-company').focus(), 50);
+}
+
+function closeModal() { document.getElementById('modal-backdrop').classList.remove('open'); }
+
+function saveModal() {
+  const company = document.getElementById('f-company').value.trim();
+  if (!company) { alert('Company is required.'); return; }
+  const data = {
+    company,
+    role: document.getElementById('f-role').value.trim(),
+    date: document.getElementById('f-date').value.trim(),
+    salary: document.getElementById('f-salary').value.trim(),
+    location: document.getElementById('f-location').value.trim(),
+    link: document.getElementById('f-link').value.trim(),
+    notes: document.getElementById('f-notes').value,
+  };
+  const column = document.getElementById('f-column').value;
+
+  if (modalMode === 'new') {
+    const newCard = Object.assign({
+      id: uid(),
+      status_label: COLUMNS.find(c => c.id === column).name,
+      column,
+    }, data);
+    state.additions.push(newCard);
+    state.columnOrder[column] = [newCard.id].concat(state.columnOrder[column] || []);
+  } else {
+    const userIndex = state.additions.findIndex(c => c.id === modalCardId);
+    if (userIndex >= 0) {
+      state.additions[userIndex] = Object.assign({}, state.additions[userIndex], data);
+    } else {
+      state.edits[modalCardId] = data;
+    }
+    state.overrides[modalCardId] = column;
+  }
+  saveState();
+  closeModal();
+  render();
+  applySearch();
+}
+
+function deleteCurrent() {
+  if (!modalCardId) return;
+  if (!confirm('Delete this card?\n\nUser-added cards are gone for good. Original cards can be brought back via Reset.')) return;
+  const userIndex = state.additions.findIndex(c => c.id === modalCardId);
+  if (userIndex >= 0) state.additions.splice(userIndex, 1);
+  else state.deletions[modalCardId] = true;
+  delete state.overrides[modalCardId];
+  delete state.edits[modalCardId];
+  Object.keys(state.columnOrder).forEach(col => {
+    state.columnOrder[col] = state.columnOrder[col].filter(id => id !== modalCardId);
+  });
+  saveState();
+  closeModal();
+  render();
+  applySearch();
+}
+
+document.getElementById('modal-backdrop').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-backdrop')) closeModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function exportJSON() {
+  const out = liveCards().map(c => Object.assign({}, c, { column: getColumn(c) }));
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'job-hunt-export.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function resetOverrides() {
+  if (!confirm('Reset all moves, ordering, edits, AND deletions back to the original card data? Your user-added cards will also be removed. This cannot be undone.')) return;
+  state = { overrides: {}, columnOrder: {}, edits: {}, additions: [], deletions: {} };
+  saveState();
+  render();
+  applySearch();
+}
+
+document.getElementById('search').addEventListener('input', applySearch);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+[
+  {"id": "saved",       "name": "Saved",            "color": "#4F8FE0", "desc": "Roles to look at later"},
+  {"id": "considering", "name": "Considering",       "color": "#E0A24F", "desc": "Deciding whether to apply"},
+  {"id": "recruiter",   "name": "Recruiter contact", "color": "#A04FE0", "desc": "Reached out via recruiter"},
+  {"id": "applied",     "name": "Applied",           "color": "#5F6F84", "desc": "Application submitted, waiting"},
+  {"id": "interview",   "name": "Interview",         "color": "#28A745", "desc": "Phone screen / interview scheduled or in-progress"},
+  {"id": "offer",       "name": "Offer",             "color": "#22C55E", "desc": "Received an offer"},
+  {"id": "rejected",    "name": "Rejected",          "color": "#C04040", "desc": "No further action - closed"},
+  {"id": "withdrawn",   "name": "Withdrawn",         "color": "#888888", "desc": "You withdrew your application"}
+]

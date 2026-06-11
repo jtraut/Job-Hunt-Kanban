@@ -1,0 +1,324 @@
+const STORAGE_KEY = 'job-hunt-tracker-v1';
+let state = { overrides: {}, columnOrder: {}, edits: {}, additions: [], deletions: {} };
+try {
+  const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  state = Object.assign(state, stored);
+  state.overrides = state.overrides || {};
+  state.columnOrder = state.columnOrder || {};
+  state.edits = state.edits || {};
+  state.additions = state.additions || [];
+  state.deletions = state.deletions || {};
+} catch (e) {}
+
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function uid() { return 'u-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function liveCards() {
+  const out = [];
+  for (const c of ORIGINAL_CARDS) {
+    if (state.deletions[c.id]) continue;
+    const edited = state.edits[c.id] || {};
+    out.push(Object.assign({}, c, edited, { _isUserAdded: false }));
+  }
+  for (const c of state.additions) {
+    out.push(Object.assign({}, c, { _isUserAdded: true }));
+  }
+  return out;
+}
+
+function getColumn(card) { return state.overrides[card.id] || card.column; }
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+function getDragAfterElement(container, y) {
+  const cards = Array.from(container.querySelectorAll('.card:not(.dragging)'));
+  let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+  for (const child of cards) {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) closest = { offset, element: child };
+  }
+  return closest.element;
+}
+
+function parseDate(d) {
+  if (!d) return 0;
+  const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return 0;
+  let yr = parseInt(m[3], 10);
+  if (yr < 100) yr += 2000;
+  return new Date(yr, parseInt(m[1], 10) - 1, parseInt(m[2], 10)).getTime();
+}
+
+function renderCard(card, colColor) {
+  const div = document.createElement('div');
+  div.className = 'card';
+  if (card._isUserAdded) div.classList.add('user-added');
+  else if (state.edits[card.id]) div.classList.add('user-edited');
+  div.draggable = true;
+  div.dataset.cardId = card.id;
+  div.style.setProperty('--accent', colColor);
+
+  const link = card.link
+    ? '<a href="' + escapeHtml(card.link) + '" target="_blank" rel="noopener">Open</a>'
+    : '';
+  const notesBtn = card.notes ? '<button onclick="toggleNotes(this)">Notes</button>' : '';
+  const editBtn = '<button class="edit-btn" onclick="openModal(\'edit\',\'' + card.id + '\')">Edit</button>';
+
+  const meta = [];
+  if (card.date) meta.push('<span class="chip date">' + escapeHtml(card.date) + '</span>');
+  if (card.salary) meta.push('<span class="chip salary">' + escapeHtml(card.salary) + '</span>');
+  if (card.location) meta.push('<span class="chip location">' + escapeHtml(card.location) + '</span>');
+
+  div.innerHTML =
+    '<div class="card-company">' + escapeHtml(card.company) + '</div>' +
+    (card.role ? '<div class="card-role">' + escapeHtml(card.role) + '</div>' : '') +
+    (meta.length ? '<div class="card-meta">' + meta.join('') + '</div>' : '') +
+    '<div class="card-actions">' + link + notesBtn + editBtn + '</div>' +
+    (card.notes ? '<div class="card-notes">' + escapeHtml(card.notes) + '</div>' : '');
+
+  div.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', card.id);
+    e.dataTransfer.effectAllowed = 'move';
+    div.classList.add('dragging');
+  });
+  div.addEventListener('dragend', () => div.classList.remove('dragging'));
+  return div;
+}
+
+function toggleNotes(btn) { btn.closest('.card').classList.toggle('expanded'); }
+
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  const cards = liveCards();
+  const cardById = Object.fromEntries(cards.map(c => [c.id, c]));
+
+  const byColumn = {};
+  COLUMNS.forEach(c => byColumn[c.id] = []);
+  cards.forEach(card => {
+    const col = getColumn(card);
+    (byColumn[col] || byColumn.applied).push(card);
+  });
+
+  COLUMNS.forEach(c => {
+    const explicit = state.columnOrder[c.id] || [];
+    const explicitSet = new Set(explicit);
+    const ordered = [];
+    explicit.forEach(id => {
+      const card = cardById[id];
+      if (card && getColumn(card) === c.id) ordered.push(card);
+    });
+    const remaining = byColumn[c.id]
+      .filter(card => !explicitSet.has(card.id))
+      .sort((a, b) => parseDate(b.date) - parseDate(a.date));
+    byColumn[c.id] = ordered.concat(remaining);
+  });
+
+  COLUMNS.forEach(c => {
+    const colDiv = document.createElement('div');
+    colDiv.className = 'column';
+    colDiv.dataset.columnId = c.id;
+    colDiv.innerHTML =
+      '<div class="column-header">' +
+        '<span class="column-dot" style="background:' + c.color + '"></span>' +
+        '<span class="column-title">' + c.name + '</span>' +
+        '<span class="column-count">' + byColumn[c.id].length + '</span>' +
+      '</div>' +
+      '<div class="column-desc">' + c.desc + '</div>' +
+      '<div class="card-list"></div>';
+    const list = colDiv.querySelector('.card-list');
+
+    if (byColumn[c.id].length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Drag cards here';
+      list.appendChild(empty);
+    } else {
+      byColumn[c.id].forEach(card => list.appendChild(renderCard(card, c.color)));
+    }
+
+    list.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      list.classList.add('drag-over');
+      const dragging = document.querySelector('.card.dragging');
+      if (!dragging) return;
+      const afterEl = getDragAfterElement(list, e.clientY);
+      if (afterEl == null) list.appendChild(dragging);
+      else if (afterEl !== dragging) list.insertBefore(dragging, afterEl);
+    });
+    list.addEventListener('dragleave', e => {
+      if (e.target === list) list.classList.remove('drag-over');
+    });
+    list.addEventListener('drop', e => {
+      e.preventDefault();
+      list.classList.remove('drag-over');
+      const cardId = e.dataTransfer.getData('text/plain');
+      if (!cardId) return;
+      state.overrides[cardId] = c.id;
+      const ids = Array.from(list.querySelectorAll('.card')).map(el => el.dataset.cardId);
+      state.columnOrder[c.id] = ids;
+      saveState();
+      render();
+      applySearch();
+    });
+
+    board.appendChild(colDiv);
+  });
+
+  const total = cards.length;
+  const inApplied = byColumn.applied.length;
+  const inInterview = byColumn.interview.length;
+  const inOffer = byColumn.offer.length;
+  document.getElementById('stats').textContent =
+    total + ' apps - ' + inApplied + ' pending - ' + inInterview + ' interviewing - ' + inOffer + ' offers';
+}
+
+function applySearch() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const cards = liveCards();
+  document.querySelectorAll('.card').forEach(cDiv => {
+    if (!q) { cDiv.classList.remove('hidden', 'match-highlight'); return; }
+    const id = cDiv.dataset.cardId;
+    const card = cards.find(x => x.id === id);
+    if (!card) return;
+    const hay = (card.company + ' ' + card.role + ' ' + card.notes + ' ' + card.salary + ' ' + card.location).toLowerCase();
+    if (hay.includes(q)) { cDiv.classList.remove('hidden'); cDiv.classList.add('match-highlight'); }
+    else { cDiv.classList.add('hidden'); cDiv.classList.remove('match-highlight'); }
+  });
+}
+
+let modalMode = 'new';
+let modalCardId = null;
+
+function populateColumnSelect(selectedColumn) {
+  const select = document.getElementById('f-column');
+  select.innerHTML = '';
+  COLUMNS.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    if (c.id === selectedColumn) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+function openModal(mode, cardId) {
+  modalMode = mode;
+  modalCardId = cardId || null;
+  const title = document.getElementById('modal-title');
+  const deleteBtn = document.getElementById('modal-delete-btn');
+
+  if (mode === 'edit') {
+    const card = liveCards().find(c => c.id === cardId);
+    if (!card) return;
+    title.textContent = 'Edit: ' + card.company;
+    document.getElementById('f-company').value = card.company || '';
+    document.getElementById('f-role').value = card.role || '';
+    document.getElementById('f-date').value = card.date || '';
+    document.getElementById('f-salary').value = card.salary || '';
+    document.getElementById('f-location').value = card.location || '';
+    document.getElementById('f-link').value = card.link || '';
+    document.getElementById('f-notes').value = card.notes || '';
+    populateColumnSelect(getColumn(card));
+    deleteBtn.classList.remove('hidden');
+  } else {
+    title.textContent = 'New application';
+    ['f-company','f-role','f-date','f-salary','f-location','f-link','f-notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    populateColumnSelect('saved');
+    deleteBtn.classList.add('hidden');
+  }
+  document.getElementById('modal-backdrop').classList.add('open');
+  setTimeout(() => document.getElementById('f-company').focus(), 50);
+}
+
+function closeModal() { document.getElementById('modal-backdrop').classList.remove('open'); }
+
+function saveModal() {
+  const company = document.getElementById('f-company').value.trim();
+  if (!company) { alert('Company is required.'); return; }
+  const data = {
+    company,
+    role: document.getElementById('f-role').value.trim(),
+    date: document.getElementById('f-date').value.trim(),
+    salary: document.getElementById('f-salary').value.trim(),
+    location: document.getElementById('f-location').value.trim(),
+    link: document.getElementById('f-link').value.trim(),
+    notes: document.getElementById('f-notes').value,
+  };
+  const column = document.getElementById('f-column').value;
+
+  if (modalMode === 'new') {
+    const newCard = Object.assign({
+      id: uid(),
+      status_label: COLUMNS.find(c => c.id === column).name,
+      column,
+    }, data);
+    state.additions.push(newCard);
+    state.columnOrder[column] = [newCard.id].concat(state.columnOrder[column] || []);
+  } else {
+    const userIndex = state.additions.findIndex(c => c.id === modalCardId);
+    if (userIndex >= 0) {
+      state.additions[userIndex] = Object.assign({}, state.additions[userIndex], data);
+    } else {
+      state.edits[modalCardId] = data;
+    }
+    state.overrides[modalCardId] = column;
+  }
+  saveState();
+  closeModal();
+  render();
+  applySearch();
+}
+
+function deleteCurrent() {
+  if (!modalCardId) return;
+  if (!confirm('Delete this card?\n\nUser-added cards are gone for good. Original cards can be brought back via Reset.')) return;
+  const userIndex = state.additions.findIndex(c => c.id === modalCardId);
+  if (userIndex >= 0) state.additions.splice(userIndex, 1);
+  else state.deletions[modalCardId] = true;
+  delete state.overrides[modalCardId];
+  delete state.edits[modalCardId];
+  Object.keys(state.columnOrder).forEach(col => {
+    state.columnOrder[col] = state.columnOrder[col].filter(id => id !== modalCardId);
+  });
+  saveState();
+  closeModal();
+  render();
+  applySearch();
+}
+
+document.getElementById('modal-backdrop').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-backdrop')) closeModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function exportJSON() {
+  const out = liveCards().map(c => Object.assign({}, c, { column: getColumn(c) }));
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'job-hunt-export.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function resetOverrides() {
+  if (!confirm('Reset all moves, ordering, edits, AND deletions back to the original card data? Your user-added cards will also be removed. This cannot be undone.')) return;
+  state = { overrides: {}, columnOrder: {}, edits: {}, additions: [], deletions: {} };
+  saveState();
+  render();
+  applySearch();
+}
+
+document.getElementById('search').addEventListener('input', applySearch);
+render();
+</script>
+</body>
+</html>
