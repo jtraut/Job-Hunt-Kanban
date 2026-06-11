@@ -4,9 +4,10 @@ Build script for Job Hunt Tracker.
 
 Produces two files:
   JobHunt_Kanban.html  — your personal board, built from job_kanban/cards/*.json (gitignored)
-  index.html           — public demo, built from job_kanban/card.example.json only (committed)
+  index.html           — public demo, built from job_kanban/demo/*.json (committed)
 
 Card data lives in job_kanban/cards/*.json (one file per card, gitignored).
+Demo cards live in job_kanban/demo/*.json (committed, no personal data).
 Board column config lives in job_kanban/columns.json (committed).
 
 Usage:
@@ -21,7 +22,7 @@ import os
 import glob
 
 CARDS_DIR    = "job_kanban/cards"
-EXAMPLE_CARD = "job_kanban/card.example.json"
+DEMO_DIR     = "job_kanban/demo"
 COLUMNS_FILE = "job_kanban/columns.json"
 HEAD_FILE    = "job_kanban/template_head.html"
 TAIL_FILE    = "job_kanban/template_tail.html"
@@ -63,10 +64,13 @@ def main():
     # Personal build — all cards from job_kanban/cards/
     build(PERSONAL_OUT, load_cards(), columns, head, tail)
 
-    # Demo build — example card only, safe to commit
-    with open(EXAMPLE_CARD, encoding="utf-8") as f:
-        example = json.load(f)
-    build(DEMO_OUT, [example], columns, head, tail)
+    # Demo build — demo cards only, safe to commit
+    demo_paths = sorted(glob.glob(os.path.join(DEMO_DIR, "*.json")))
+    demo_cards = []
+    for p in demo_paths:
+        with open(p, encoding="utf-8") as f:
+            demo_cards.append(json.load(f))
+    build(DEMO_OUT, demo_cards, columns, head, tail)
 
 
 if __name__ == "__main__":
