@@ -248,6 +248,13 @@ function render() {
       uiState.overrides[cardId] = c.id;
       uiState.columnOrder[c.id] = Array.from(list.querySelectorAll('.card')).map(el => el.dataset.cardId);
       saveUI();
+      // Update the card object and persist to file
+      const card = cards.find(x => x.id === cardId);
+      if (card) {
+        card.column = c.id;
+        card.status_label = c.name;
+        persistCard(card);
+      }
       render();
       applySearch();
     });
