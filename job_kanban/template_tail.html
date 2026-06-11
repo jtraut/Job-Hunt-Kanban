@@ -26,7 +26,20 @@ function liveCards() {
   return out;
 }
 
-function getColumn(card) { return state.overrides[card.id] || card.column; }
+function ageInDays(d) {
+  const ts = parseDate(d);
+  return ts ? (Date.now() - ts) / 86400000 : 0;
+}
+
+function getColumn(card) {
+  if (state.overrides[card.id]) return state.overrides[card.id];
+  if (card.column === 'applied') {
+    const age = ageInDays(card.date);
+    if (age >= 180) return 'rejected';
+    if (age >= 90)  return 'stale';
+  }
+  return card.column;
+}
 
 function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

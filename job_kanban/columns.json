@@ -6,5 +6,6 @@
   {"id": "interview",   "name": "Interview",         "color": "#28A745", "desc": "Phone screen / interview scheduled or in-progress"},
   {"id": "offer",       "name": "Offer",             "color": "#22C55E", "desc": "Received an offer"},
   {"id": "rejected",    "name": "Rejected",          "color": "#C04040", "desc": "No further action - closed"},
+  {"id": "stale",       "name": "Stale",             "color": "#C47C20", "desc": "No response in 3+ months — auto-rejected after 6 months"},
   {"id": "withdrawn",   "name": "Withdrawn",         "color": "#888888", "desc": "You withdrew your application"}
 ]
