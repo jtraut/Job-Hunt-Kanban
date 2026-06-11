@@ -185,7 +185,7 @@ function renderCard(card, colColor) {
   div.dataset.cardId = card.id;
   div.style.setProperty('--accent', colColor);
 
-  const link     = card.link   ? '<a href="' + escapeHtml(card.link) + '" target="_blank" rel="noopener">Open</a>' : '';
+  const link     = card.link   ? '<a href="' + escapeHtml(card.link) + '" target="_blank" rel="noopener">Source</a>' : '';
   const notesBtn = card.notes  ? '<button onclick="toggleNotes(this)">Notes</button>' : '';
   const editBtn  = '<button class="edit-btn" onclick="openModal(\'edit\',\'' + card.id + '\')">Edit</button>';
 
