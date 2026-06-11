@@ -4,86 +4,72 @@ A kanban-style job application tracker that runs as a single HTML file — no se
 
 **[Live Demo →](https://jtraut.github.io/Job-Hunt-Kanban/)**
 
-![Board columns: Saved, Considering, Recruiter, Applied, Interview, Offer, Rejected, Withdrawn](https://img.shields.io/badge/columns-8-blue)
-
 ---
 
 ## Features
 
 - Drag cards between columns to update status
 - Add, edit, and delete cards via a modal form
+- **Auto-stale:** applied cards with no response in 3+ months move to Stale automatically
+- **Auto-reject:** stale cards older than 6 months move to Rejected automatically
 - Search across company, role, notes, salary, and location
 - Notes per card (cover letter drafts, recruiter info, interview prep)
-- All state persisted in `localStorage` — no data leaves your browser
+- **File-backed storage** (Chrome/Edge): connect your `job_kanban/cards/` folder and cards save as individual JSON files in real time
+- **localStorage fallback**: works in any browser without connecting a folder
 - Export the full board to JSON at any time
 
 ---
 
-## Using it locally
-
-### 1. Clone the repo
+## Quick start
 
 ```bash
 git clone https://github.com/jtraut/Job-Hunt-Kanban.git
 cd Job-Hunt-Kanban
+open JobHunt_Kanban.html   # or just double-click it
 ```
 
-### 2. Add your own cards
+That's it — no build step required. Start adding cards with the **+ New** button.
 
-Each card is a `.json` file in `job_kanban/cards/`. Copy the example to get started:
+---
 
-```bash
-cp job_kanban/card.example.json job_kanban/cards/my-first-job.json
-```
+## Saving cards as files (optional, Chrome/Edge only)
 
-Edit the file with your job details:
+By default cards are saved in `localStorage`. To save them as individual JSON files in `job_kanban/cards/` instead:
 
-```json
-{
-  "id": "abc123def4",
-  "company": "Acme Corp",
-  "role": "Senior Software Engineer",
-  "date": "6/1/26",
-  "salary": "150-180K",
-  "location": "Remote",
-  "link": "https://example.com/jobs/12345",
-  "notes": "Cover letter sent. Recruiter: Jane Smith.",
-  "status_label": "Applied",
-  "column": "applied"
-}
-```
+1. Click **Connect folder** in the header
+2. Select the `job_kanban/cards/` directory (or any folder you prefer)
+3. Grant read/write access when prompted
 
-> **`id`** — any unique string; `python -c "import uuid; print(uuid.uuid4().hex[:10])"` generates one.  
-> **`column`** — one of: `saved`, `considering`, `recruiter`, `applied`, `interview`, `offer`, `rejected`, `withdrawn`
+From that point on, every add/edit/delete writes directly to files. The folder stays connected across browser sessions. Any cards already in localStorage are migrated to files automatically on connect.
 
-### 3. Build the HTML
+> **Why files?** Each card is a plain `.json` file you can read, edit, back up, or version-control independently. The folder is gitignored so your personal applications never appear on the public repo.
 
-```bash
-python build_kanban_html.py
-```
+---
 
-This produces two files:
-- `JobHunt_Kanban.html` — your personal board with all your cards (gitignored)
-- `index.html` — the public demo, rebuilt from `card.example.json` only (committed)
+## Columns
 
-### 4. Open in your browser
+| Column | Description |
+|---|---|
+| Saved | Roles to revisit later |
+| Considering | Deciding whether to apply |
+| Recruiter contact | Reached out via recruiter |
+| Applied | Application submitted, waiting |
+| Interview | Phone screen / interview in progress |
+| Offer | Received an offer |
+| Rejected | No further action |
+| **Stale** | No response in 3+ months — auto-rejected after 6 months |
+| Withdrawn | You withdrew your application |
 
-```bash
-open JobHunt_Kanban.html        # macOS
-start JobHunt_Kanban.html       # Windows
-xdg-open JobHunt_Kanban.html   # Linux
-```
-
-No server needed — open the file directly.
+Stale and auto-reject are derived from the card's application date with no manual action needed. Dragging a card to any column overrides the auto-placement.
 
 ---
 
 ## Customizing columns
 
-Edit `job_kanban/columns.json` to rename, recolor, or add columns, then rebuild.
+Edit `job_kanban/columns.json`, then run `python build_kanban_html.py` to rebuild.
 
 ---
 
 ## Privacy
 
-Your card files (`job_kanban/cards/*.json`) are listed in `.gitignore` and will never be committed. Only the templates, build script, and columns config are tracked.
+`job_kanban/cards/*.json` is in `.gitignore` and will never be committed. The HTML files committed to this repo contain no personal data — cards load at runtime from your connected folder or localStorage.

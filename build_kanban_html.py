@@ -3,18 +3,13 @@
 Build script for Job Hunt Tracker.
 
 Produces two files:
-  JobHunt_Kanban.html  — your personal board, built from job_kanban/cards/*.json (gitignored)
   index.html           — public demo, built from job_kanban/demo/*.json (committed)
+  JobHunt_Kanban.html  — always built with ORIGINAL_CARDS=[] (committed, safe to share)
+                         Cards are loaded at runtime via the File System Access API
+                         or localStorage — no personal data baked in.
 
-Card data lives in job_kanban/cards/*.json (one file per card, gitignored).
-Demo cards live in job_kanban/demo/*.json (committed, no personal data).
-Board column config lives in job_kanban/columns.json (committed).
-
-Usage:
-  python build_kanban_html.py
-
-To add a card: create a new .json file in job_kanban/cards/ and re-run.
-See job_kanban/card.example.json for the expected field format.
+Run this script when you change templates, columns, or demo cards.
+For day-to-day personal use, just open JobHunt_Kanban.html and use "Connect folder".
 """
 
 import json
@@ -61,8 +56,8 @@ def main():
     with open(TAIL_FILE, encoding="utf-8") as f:
         tail = f.read()
 
-    # Personal build — all cards from job_kanban/cards/
-    build(PERSONAL_OUT, load_cards(), columns, head, tail)
+    # Personal build — always empty ORIGINAL_CARDS; cards load at runtime via UI
+    build(PERSONAL_OUT, [], columns, head, tail)
 
     # Demo build — demo cards only, safe to commit
     demo_paths = sorted(glob.glob(os.path.join(DEMO_DIR, "*.json")))

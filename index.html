@@ -102,34 +102,8 @@
   }
   .card:hover { box-shadow: 0 2px 6px rgba(9,30,66,0.25); }
   .card.dragging { opacity: 0.4; cursor: grabbing; }
-  .card.user-added::after {
-    content: 'new';
-    position: absolute;
-    top: 6px;
-    right: 8px;
-    font-size: 9px;
-    color: #2563eb;
-    background: #dbeafe;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-  }
-  .card.user-edited::after {
-    content: 'edited';
-    position: absolute;
-    top: 6px;
-    right: 8px;
-    font-size: 9px;
-    color: #92400e;
-    background: #fef3c7;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-  }
+  .btn.connected { background: #166534; border-color: #166534; }
+  .btn.connected:hover { background: #14532d; }
   .card-company { font-weight: 600; font-size: 14px; color: #172b4d; margin-bottom: 2px; padding-right: 52px; }
   .card-role { font-size: 12.5px; color: #42526e; line-height: 1.35; margin-bottom: 6px; }
   .card-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 11px; color: #6b778c; margin-bottom: 6px; }
@@ -231,7 +205,7 @@
   <div class="header-actions">
     <button class="btn primary" onclick="openModal('new')">+ New</button>
     <button class="btn" onclick="exportJSON()">Export</button>
-    <button class="btn" onclick="resetOverrides()" title="Reset all moves, edits, and additions back to the original card data">Reset</button>
+    <button class="btn" id="folder-btn" onclick="connectFolder()">Connect folder</button>
   </div>
 </header>
 <div class="board" id="board"></div>
@@ -260,63 +234,117 @@
 <script>
 const COLUMNS = [{"id": "saved", "name": "Saved", "color": "#4F8FE0", "desc": "Roles to look at later"}, {"id": "considering", "name": "Considering", "color": "#E0A24F", "desc": "Deciding whether to apply"}, {"id": "recruiter", "name": "Recruiter contact", "color": "#A04FE0", "desc": "Reached out via recruiter"}, {"id": "applied", "name": "Applied", "color": "#5F6F84", "desc": "Application submitted, waiting"}, {"id": "interview", "name": "Interview", "color": "#28A745", "desc": "Phone screen / interview scheduled or in-progress"}, {"id": "offer", "name": "Offer", "color": "#22C55E", "desc": "Received an offer"}, {"id": "rejected", "name": "Rejected", "color": "#C04040", "desc": "No further action - closed"}, {"id": "stale", "name": "Stale", "color": "#C47C20", "desc": "No response in 3+ months — auto-rejected after 6 months"}, {"id": "withdrawn", "name": "Withdrawn", "color": "#888888", "desc": "You withdrew your application"}];
 const ORIGINAL_CARDS = [{"id": "a1b2c3d4e5", "company": "Stripe", "role": "Senior Software Engineer, Payments Infrastructure", "date": "6/1/26", "salary": "200-240K", "location": "Remote", "link": "https://stripe.com/jobs", "notes": "Found via LinkedIn. Strong culture fit — distributed team, async-first. Worth a closer look at the JD before applying.", "status_label": "Saved", "column": "saved"}, {"id": "a7b8c9d0e1", "company": "Figma", "role": "Staff Engineer, Multiplayer", "date": "5/5/26", "salary": "240-300K", "location": "Remote", "link": "https://figma.com/careers", "notes": "Failed the system design round. Interviewer wanted deeper CRDTs knowledge. Worth revisiting in 6 months.", "status_label": "Rejected", "column": "rejected"}, {"id": "abc123def4", "company": "Acme Corp", "role": "Senior Software Engineer", "date": "6/1/26", "salary": "150-180K", "location": "Remote", "link": "https://example.com/jobs/12345", "notes": "Cover letter sent. Recruiter: Jane Smith (jane@acme.com)\nPhone screen scheduled for June 5.", "status_label": "Applied", "column": "applied"}, {"id": "b2c3d4e5f6", "company": "Vercel", "role": "Staff Engineer, Edge Runtime", "date": "6/3/26", "salary": "210-260K", "location": "Remote", "link": "https://vercel.com/careers", "notes": "Role looks great but salary band is unclear. Waiting to hear back from a contact there before applying.", "status_label": "Considering", "column": "considering"}, {"id": "b8c9d0e1f2", "company": "Datadog", "role": "Senior Software Engineer, Observability", "date": "4/28/26", "salary": "180-220K", "location": "Remote / NYC", "link": "https://datadoghq.com/careers", "notes": "Withdrew after Fly.io offer came in. Team seemed great — would reapply if the offer falls through.", "status_label": "Withdrawn", "column": "withdrawn"}, {"id": "c3d4e5f6a7", "company": "Notion", "role": "Senior Backend Engineer", "date": "6/4/26", "salary": "185-220K", "location": "Remote", "link": "https://notion.com/careers", "notes": "Recruiter (Sarah Kim) reached out on LinkedIn. Scheduled intro call for June 10. She mentioned the team is growing fast and moving quickly on candidates.", "status_label": "Recruiter contact", "column": "recruiter"}, {"id": "c9d0e1f2a3", "company": "Shopify", "role": "Senior Software Engineer, Core", "date": "2/5/26", "salary": "170-210K", "location": "Remote", "link": "https://shopify.com/careers", "notes": "Applied via careers page, no recruiter contact since. Following up might be worth a shot.", "status_label": "Applied", "column": "applied"}, {"id": "d0e1f2a3b4", "company": "Atlassian", "role": "Staff Software Engineer, Jira Platform", "date": "11/8/25", "salary": "200-250K", "location": "Remote", "link": "https://atlassian.com/careers", "notes": "Applied November 2025. Never heard back. Auto-moved to rejected per 6-month rule.", "status_label": "Applied", "column": "applied"}, {"id": "d4e5f6a7b8", "company": "Linear", "role": "Senior Software Engineer, Product", "date": "5/28/26", "salary": "190-230K", "location": "Remote", "link": "https://linear.app/careers", "notes": "Applied cold via careers page. Tailored resume to emphasize product ownership and end-to-end shipping.", "status_label": "Applied", "column": "applied"}, {"id": "e5f6a7b8c9", "company": "Cloudflare", "role": "Systems Engineer, Edge Network", "date": "5/20/26", "salary": "195-245K", "location": "Remote", "link": "https://cloudflare.com/careers", "notes": "Phone screen done — went well. Panel interview scheduled June 12 with 3 engineers.\nTopics to prep: distributed systems, consensus, Rust basics.", "status_label": "Interview", "column": "interview"}, {"id": "f6a7b8c9d0", "company": "Fly.io", "role": "Senior Software Engineer", "date": "5/10/26", "salary": "175-210K", "location": "Remote", "link": "https://fly.io/jobs", "notes": "Offer received June 8!\nBase: $195K + equity (0.05% over 4yr)\nDecision deadline: June 15\nComparing against Cloudflare interview outcome before deciding.", "status_label": "Offer", "column": "offer"}];
-const STORAGE_KEY = 'job-hunt-tracker-v1';
-let state = { overrides: {}, columnOrder: {}, edits: {}, additions: [], deletions: {} };
-try {
-  const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-  state = Object.assign(state, stored);
-  state.overrides = state.overrides || {};
-  state.columnOrder = state.columnOrder || {};
-  state.edits = state.edits || {};
-  state.additions = state.additions || [];
-  state.deletions = state.deletions || {};
-} catch (e) {}
+// ── UI state (column positions/ordering — always localStorage) ────────────
+const UI_KEY = 'job-hunt-ui-v1';
+let uiState = { overrides: {}, columnOrder: {} };
+try { Object.assign(uiState, JSON.parse(localStorage.getItem(UI_KEY) || '{}')); } catch {}
+function saveUI() { localStorage.setItem(UI_KEY, JSON.stringify(uiState)); }
 
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-function uid() { return 'u-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+// ── Cards (file-backed or localStorage fallback) ──────────────────────────
+const CARDS_KEY = 'job-hunt-cards-v1';
+let cards = [...ORIGINAL_CARDS];
+let dirHandle = null;
+const FS_SUPPORTED = 'showDirectoryPicker' in window;
 
-function liveCards() {
-  const out = [];
-  for (const c of ORIGINAL_CARDS) {
-    if (state.deletions[c.id]) continue;
-    const edited = state.edits[c.id] || {};
-    out.push(Object.assign({}, c, edited, { _isUserAdded: false }));
+// ── IndexedDB helpers (persist directory handle across sessions) ──────────
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('job-hunt-tracker', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror  = () => rej(r.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise(res => {
+    const r = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+    r.onsuccess = () => res(r.result || null);
+    r.onerror   = () => res(null);
+  });
+}
+async function idbSet(key, val) {
+  const db = await idbOpen();
+  return new Promise(res => {
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(val, key);
+    tx.oncomplete = res;
+  });
+}
+
+// ── File System Access helpers ────────────────────────────────────────────
+async function loadCardsFromDir(handle) {
+  const loaded = [];
+  for await (const [name, fh] of handle.entries()) {
+    if (!name.endsWith('.json')) continue;
+    try { loaded.push(JSON.parse(await (await fh.getFile()).text())); } catch {}
   }
-  for (const c of state.additions) {
-    out.push(Object.assign({}, c, { _isUserAdded: true }));
+  return loaded;
+}
+
+async function writeCardFile(card) {
+  const fh = await dirHandle.getFileHandle(card.id + '.json', { create: true });
+  const w  = await fh.createWritable();
+  await w.write(JSON.stringify(card, null, 2));
+  await w.close();
+}
+
+async function removeCardFile(id) {
+  try { await dirHandle.removeEntry(id + '.json'); } catch {}
+}
+
+async function connectFolder() {
+  if (!FS_SUPPORTED) {
+    alert('File System Access is not supported in this browser.\nTry Chrome or Edge to save cards as files automatically.\n\nCards will continue to be saved in localStorage.');
+    return;
   }
-  return out;
-}
-
-function ageInDays(d) {
-  const ts = parseDate(d);
-  return ts ? (Date.now() - ts) / 86400000 : 0;
-}
-
-function getColumn(card) {
-  if (state.overrides[card.id]) return state.overrides[card.id];
-  if (card.column === 'applied') {
-    const age = ageInDays(card.date);
-    if (age >= 180) return 'rejected';
-    if (age >= 90)  return 'stale';
+  try {
+    const h = await window.showDirectoryPicker({ mode: 'readwrite' });
+    dirHandle = h;
+    await idbSet('dirHandle', h);
+    const fromFiles = await loadCardsFromDir(h);
+    // Merge: files win; append any localStorage-only cards not yet in files
+    const fileIds = new Set(fromFiles.map(c => c.id));
+    const localOnly = cards.filter(c => !fileIds.has(c.id));
+    cards = [...fromFiles, ...localOnly];
+    for (const c of localOnly) await writeCardFile(c); // migrate to files
+    updateFolderBtn();
+    render();
+    applySearch();
+  } catch (e) {
+    if (e.name !== 'AbortError') alert('Could not access folder: ' + e.message);
   }
-  return card.column;
 }
 
-function escapeHtml(s) {
-  return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-}
-
-function getDragAfterElement(container, y) {
-  const cards = Array.from(container.querySelectorAll('.card:not(.dragging)'));
-  let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
-  for (const child of cards) {
-    const box = child.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-    if (offset < 0 && offset > closest.offset) closest = { offset, element: child };
+function updateFolderBtn() {
+  const btn = document.getElementById('folder-btn');
+  if (!btn) return;
+  if (dirHandle) {
+    btn.textContent = '📁 ' + dirHandle.name;
+    btn.title = 'Cards folder connected — click to change';
+    btn.classList.add('connected');
+  } else {
+    btn.textContent = 'Connect folder';
+    btn.title = FS_SUPPORTED
+      ? 'Connect job_kanban/cards/ to save cards as individual JSON files'
+      : 'File System Access not supported in this browser (try Chrome or Edge)';
+    btn.classList.remove('connected');
   }
-  return closest.element;
 }
+
+// ── Card persistence ──────────────────────────────────────────────────────
+async function persistCard(card) {
+  if (dirHandle) { try { await writeCardFile(card); } catch {} }
+  else localStorage.setItem(CARDS_KEY, JSON.stringify(cards));
+}
+
+async function unpersistCard(id) {
+  if (dirHandle) { try { await removeCardFile(id); } catch {} }
+  else localStorage.setItem(CARDS_KEY, JSON.stringify(cards));
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 function parseDate(d) {
   if (!d) return 0;
@@ -327,32 +355,60 @@ function parseDate(d) {
   return new Date(yr, parseInt(m[1], 10) - 1, parseInt(m[2], 10)).getTime();
 }
 
+function ageInDays(d) {
+  const ts = parseDate(d);
+  return ts ? (Date.now() - ts) / 86400000 : 0;
+}
+
+function getColumn(card) {
+  if (uiState.overrides[card.id]) return uiState.overrides[card.id];
+  if (card.column === 'applied') {
+    const age = ageInDays(card.date);
+    if (age >= 180) return 'rejected';
+    if (age >= 90)  return 'stale';
+  }
+  return card.column;
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+function getDragAfterElement(container, y) {
+  const els = Array.from(container.querySelectorAll('.card:not(.dragging)'));
+  let closest = { offset: -Infinity, element: null };
+  for (const el of els) {
+    const box = el.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) closest = { offset, element: el };
+  }
+  return closest.element;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
 function renderCard(card, colColor) {
   const div = document.createElement('div');
   div.className = 'card';
-  if (card._isUserAdded) div.classList.add('user-added');
-  else if (state.edits[card.id]) div.classList.add('user-edited');
   div.draggable = true;
   div.dataset.cardId = card.id;
   div.style.setProperty('--accent', colColor);
 
-  const link = card.link
-    ? '<a href="' + escapeHtml(card.link) + '" target="_blank" rel="noopener">Open</a>'
-    : '';
-  const notesBtn = card.notes ? '<button onclick="toggleNotes(this)">Notes</button>' : '';
-  const editBtn = '<button class="edit-btn" onclick="openModal(\'edit\',\'' + card.id + '\')">Edit</button>';
+  const link     = card.link   ? '<a href="' + escapeHtml(card.link) + '" target="_blank" rel="noopener">Open</a>' : '';
+  const notesBtn = card.notes  ? '<button onclick="toggleNotes(this)">Notes</button>' : '';
+  const editBtn  = '<button class="edit-btn" onclick="openModal(\'edit\',\'' + card.id + '\')">Edit</button>';
 
   const meta = [];
-  if (card.date) meta.push('<span class="chip date">' + escapeHtml(card.date) + '</span>');
-  if (card.salary) meta.push('<span class="chip salary">' + escapeHtml(card.salary) + '</span>');
+  if (card.date)     meta.push('<span class="chip date">'     + escapeHtml(card.date)     + '</span>');
+  if (card.salary)   meta.push('<span class="chip salary">'   + escapeHtml(card.salary)   + '</span>');
   if (card.location) meta.push('<span class="chip location">' + escapeHtml(card.location) + '</span>');
 
   div.innerHTML =
     '<div class="card-company">' + escapeHtml(card.company) + '</div>' +
-    (card.role ? '<div class="card-role">' + escapeHtml(card.role) + '</div>' : '') +
-    (meta.length ? '<div class="card-meta">' + meta.join('') + '</div>' : '') +
+    (card.role   ? '<div class="card-role">'  + escapeHtml(card.role)  + '</div>' : '') +
+    (meta.length ? '<div class="card-meta">'  + meta.join('')          + '</div>' : '') +
     '<div class="card-actions">' + link + notesBtn + editBtn + '</div>' +
-    (card.notes ? '<div class="card-notes">' + escapeHtml(card.notes) + '</div>' : '');
+    (card.notes  ? '<div class="card-notes">' + escapeHtml(card.notes) + '</div>' : '');
 
   div.addEventListener('dragstart', e => {
     e.dataTransfer.setData('text/plain', card.id);
@@ -368,7 +424,6 @@ function toggleNotes(btn) { btn.closest('.card').classList.toggle('expanded'); }
 function render() {
   const board = document.getElementById('board');
   board.innerHTML = '';
-  const cards = liveCards();
   const cardById = Object.fromEntries(cards.map(c => [c.id, c]));
 
   const byColumn = {};
@@ -379,20 +434,16 @@ function render() {
   });
 
   COLUMNS.forEach(c => {
-    const explicit = state.columnOrder[c.id] || [];
+    const explicit    = uiState.columnOrder[c.id] || [];
     const explicitSet = new Set(explicit);
-    const ordered = [];
-    explicit.forEach(id => {
-      const card = cardById[id];
-      if (card && getColumn(card) === c.id) ordered.push(card);
-    });
-    const remaining = byColumn[c.id]
+    const ordered     = explicit
+      .map(id => cardById[id])
+      .filter(card => card && getColumn(card) === c.id);
+    const remaining   = byColumn[c.id]
       .filter(card => !explicitSet.has(card.id))
       .sort((a, b) => parseDate(b.date) - parseDate(a.date));
     byColumn[c.id] = ordered.concat(remaining);
-  });
 
-  COLUMNS.forEach(c => {
     const colDiv = document.createElement('div');
     colDiv.className = 'column';
     colDiv.dataset.columnId = c.id;
@@ -404,13 +455,10 @@ function render() {
       '</div>' +
       '<div class="column-desc">' + c.desc + '</div>' +
       '<div class="card-list"></div>';
-    const list = colDiv.querySelector('.card-list');
 
+    const list = colDiv.querySelector('.card-list');
     if (byColumn[c.id].length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = 'Drag cards here';
-      list.appendChild(empty);
+      list.innerHTML = '<div class="empty">Drag cards here</div>';
     } else {
       byColumn[c.id].forEach(card => list.appendChild(renderCard(card, c.color)));
     }
@@ -421,9 +469,9 @@ function render() {
       list.classList.add('drag-over');
       const dragging = document.querySelector('.card.dragging');
       if (!dragging) return;
-      const afterEl = getDragAfterElement(list, e.clientY);
-      if (afterEl == null) list.appendChild(dragging);
-      else if (afterEl !== dragging) list.insertBefore(dragging, afterEl);
+      const after = getDragAfterElement(list, e.clientY);
+      if (after == null) list.appendChild(dragging);
+      else if (after !== dragging) list.insertBefore(dragging, after);
     });
     list.addEventListener('dragleave', e => {
       if (e.target === list) list.classList.remove('drag-over');
@@ -433,10 +481,9 @@ function render() {
       list.classList.remove('drag-over');
       const cardId = e.dataTransfer.getData('text/plain');
       if (!cardId) return;
-      state.overrides[cardId] = c.id;
-      const ids = Array.from(list.querySelectorAll('.card')).map(el => el.dataset.cardId);
-      state.columnOrder[c.id] = ids;
-      saveState();
+      uiState.overrides[cardId] = c.id;
+      uiState.columnOrder[c.id] = Array.from(list.querySelectorAll('.card')).map(el => el.dataset.cardId);
+      saveUI();
       render();
       applySearch();
     });
@@ -444,68 +491,60 @@ function render() {
     board.appendChild(colDiv);
   });
 
-  const total = cards.length;
-  const inApplied = byColumn.applied.length;
-  const inInterview = byColumn.interview.length;
-  const inOffer = byColumn.offer.length;
   document.getElementById('stats').textContent =
-    total + ' apps - ' + inApplied + ' pending - ' + inInterview + ' interviewing - ' + inOffer + ' offers';
+    cards.length + ' apps · ' +
+    (byColumn.applied   || []).length + ' pending · ' +
+    (byColumn.interview || []).length + ' interviewing · ' +
+    (byColumn.offer     || []).length + ' offers';
 }
 
+// ── Search ────────────────────────────────────────────────────────────────
 function applySearch() {
   const q = document.getElementById('search').value.toLowerCase().trim();
-  const cards = liveCards();
-  document.querySelectorAll('.card').forEach(cDiv => {
-    if (!q) { cDiv.classList.remove('hidden', 'match-highlight'); return; }
-    const id = cDiv.dataset.cardId;
-    const card = cards.find(x => x.id === id);
+  document.querySelectorAll('.card').forEach(div => {
+    if (!q) { div.classList.remove('hidden', 'match-highlight'); return; }
+    const card = cards.find(c => c.id === div.dataset.cardId);
     if (!card) return;
-    const hay = (card.company + ' ' + card.role + ' ' + card.notes + ' ' + card.salary + ' ' + card.location).toLowerCase();
-    if (hay.includes(q)) { cDiv.classList.remove('hidden'); cDiv.classList.add('match-highlight'); }
-    else { cDiv.classList.add('hidden'); cDiv.classList.remove('match-highlight'); }
+    const hay = [card.company, card.role, card.notes, card.salary, card.location].join(' ').toLowerCase();
+    if (hay.includes(q)) { div.classList.remove('hidden'); div.classList.add('match-highlight'); }
+    else { div.classList.add('hidden'); div.classList.remove('match-highlight'); }
   });
 }
 
+// ── Modal ─────────────────────────────────────────────────────────────────
 let modalMode = 'new';
 let modalCardId = null;
 
-function populateColumnSelect(selectedColumn) {
-  const select = document.getElementById('f-column');
-  select.innerHTML = '';
-  COLUMNS.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name;
-    if (c.id === selectedColumn) opt.selected = true;
-    select.appendChild(opt);
-  });
+function populateColumnSelect(selected) {
+  const sel = document.getElementById('f-column');
+  sel.innerHTML = COLUMNS.map(c =>
+    '<option value="' + c.id + '"' + (c.id === selected ? ' selected' : '') + '>' + c.name + '</option>'
+  ).join('');
 }
 
 function openModal(mode, cardId) {
-  modalMode = mode;
+  modalMode   = mode;
   modalCardId = cardId || null;
-  const title = document.getElementById('modal-title');
   const deleteBtn = document.getElementById('modal-delete-btn');
 
   if (mode === 'edit') {
-    const card = liveCards().find(c => c.id === cardId);
+    const card = cards.find(c => c.id === cardId);
     if (!card) return;
-    title.textContent = 'Edit: ' + card.company;
-    document.getElementById('f-company').value = card.company || '';
-    document.getElementById('f-role').value = card.role || '';
-    document.getElementById('f-date').value = card.date || '';
-    document.getElementById('f-salary').value = card.salary || '';
+    document.getElementById('modal-title').textContent = 'Edit: ' + card.company;
+    document.getElementById('f-company').value  = card.company  || '';
+    document.getElementById('f-role').value     = card.role     || '';
+    document.getElementById('f-date').value     = card.date     || '';
+    document.getElementById('f-salary').value   = card.salary   || '';
     document.getElementById('f-location').value = card.location || '';
-    document.getElementById('f-link').value = card.link || '';
-    document.getElementById('f-notes').value = card.notes || '';
+    document.getElementById('f-link').value     = card.link     || '';
+    document.getElementById('f-notes').value    = card.notes    || '';
     populateColumnSelect(getColumn(card));
     deleteBtn.classList.remove('hidden');
   } else {
-    title.textContent = 'New application';
-    ['f-company','f-role','f-date','f-salary','f-location','f-link','f-notes'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-    populateColumnSelect('saved');
+    document.getElementById('modal-title').textContent = 'New application';
+    ['f-company','f-role','f-date','f-salary','f-location','f-link','f-notes']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    populateColumnSelect('applied');
     deleteBtn.classList.add('hidden');
   }
   document.getElementById('modal-backdrop').classList.add('open');
@@ -514,86 +553,101 @@ function openModal(mode, cardId) {
 
 function closeModal() { document.getElementById('modal-backdrop').classList.remove('open'); }
 
-function saveModal() {
+async function saveModal() {
   const company = document.getElementById('f-company').value.trim();
   if (!company) { alert('Company is required.'); return; }
+
+  const column = document.getElementById('f-column').value;
   const data = {
     company,
-    role: document.getElementById('f-role').value.trim(),
-    date: document.getElementById('f-date').value.trim(),
-    salary: document.getElementById('f-salary').value.trim(),
-    location: document.getElementById('f-location').value.trim(),
-    link: document.getElementById('f-link').value.trim(),
-    notes: document.getElementById('f-notes').value,
+    role:         document.getElementById('f-role').value.trim(),
+    date:         document.getElementById('f-date').value.trim(),
+    salary:       document.getElementById('f-salary').value.trim(),
+    location:     document.getElementById('f-location').value.trim(),
+    link:         document.getElementById('f-link').value.trim(),
+    notes:        document.getElementById('f-notes').value,
+    column,
+    status_label: (COLUMNS.find(c => c.id === column) || {}).name || column,
   };
-  const column = document.getElementById('f-column').value;
 
   if (modalMode === 'new') {
-    const newCard = Object.assign({
-      id: uid(),
-      status_label: COLUMNS.find(c => c.id === column).name,
-      column,
-    }, data);
-    state.additions.push(newCard);
-    state.columnOrder[column] = [newCard.id].concat(state.columnOrder[column] || []);
+    const card = Object.assign({ id: uid() }, data);
+    cards.unshift(card);
+    uiState.columnOrder[column] = [card.id, ...(uiState.columnOrder[column] || [])];
+    saveUI();
+    await persistCard(card);
   } else {
-    const userIndex = state.additions.findIndex(c => c.id === modalCardId);
-    if (userIndex >= 0) {
-      state.additions[userIndex] = Object.assign({}, state.additions[userIndex], data);
-    } else {
-      state.edits[modalCardId] = data;
+    const idx = cards.findIndex(c => c.id === modalCardId);
+    if (idx >= 0) {
+      Object.assign(cards[idx], data);
+      uiState.overrides[modalCardId] = column;
+      saveUI();
+      await persistCard(cards[idx]);
     }
-    state.overrides[modalCardId] = column;
   }
-  saveState();
   closeModal();
   render();
   applySearch();
 }
 
-function deleteCurrent() {
-  if (!modalCardId) return;
-  if (!confirm('Delete this card?\n\nUser-added cards are gone for good. Original cards can be brought back via Reset.')) return;
-  const userIndex = state.additions.findIndex(c => c.id === modalCardId);
-  if (userIndex >= 0) state.additions.splice(userIndex, 1);
-  else state.deletions[modalCardId] = true;
-  delete state.overrides[modalCardId];
-  delete state.edits[modalCardId];
-  Object.keys(state.columnOrder).forEach(col => {
-    state.columnOrder[col] = state.columnOrder[col].filter(id => id !== modalCardId);
+async function deleteCurrent() {
+  if (!modalCardId || !confirm('Delete this card? This cannot be undone.')) return;
+  const id = modalCardId;
+  cards = cards.filter(c => c.id !== id);
+  delete uiState.overrides[id];
+  Object.keys(uiState.columnOrder).forEach(col => {
+    uiState.columnOrder[col] = uiState.columnOrder[col].filter(x => x !== id);
   });
-  saveState();
+  saveUI();
+  await unpersistCard(id);
   closeModal();
   render();
   applySearch();
 }
 
+// ── Export ────────────────────────────────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(cards, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'job-hunt-export.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────
 document.getElementById('modal-backdrop').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-backdrop')) closeModal();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.getElementById('search').addEventListener('input', applySearch);
 
-function exportJSON() {
-  const out = liveCards().map(c => Object.assign({}, c, { column: getColumn(c) }));
-  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'job-hunt-export.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// ── Init ──────────────────────────────────────────────────────────────────
+async function init() {
+  // Load from localStorage if no baked-in cards
+  if (cards.length === 0) {
+    try {
+      const stored = JSON.parse(localStorage.getItem(CARDS_KEY) || '[]');
+      if (stored.length > 0) cards = stored;
+    } catch {}
+  }
 
-function resetOverrides() {
-  if (!confirm('Reset all moves, ordering, edits, AND deletions back to the original card data? Your user-added cards will also be removed. This cannot be undone.')) return;
-  state = { overrides: {}, columnOrder: {}, edits: {}, additions: [], deletions: {} };
-  saveState();
+  // Try to restore previously connected folder
+  if (FS_SUPPORTED) {
+    try {
+      const h = await idbGet('dirHandle');
+      if (h && (await h.queryPermission({ mode: 'readwrite' })) === 'granted') {
+        dirHandle = h;
+        cards = await loadCardsFromDir(h);
+      }
+    } catch {}
+  }
+
+  updateFolderBtn();
   render();
   applySearch();
 }
 
-document.getElementById('search').addEventListener('input', applySearch);
-render();
+init();
 </script>
 </body>
 </html>
