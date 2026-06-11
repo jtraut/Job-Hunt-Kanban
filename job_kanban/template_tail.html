@@ -8,6 +8,7 @@ function saveUI() { localStorage.setItem(UI_KEY, JSON.stringify(uiState)); }
 const CARDS_KEY = 'job-hunt-cards-v1';
 let cards = [...ORIGINAL_CARDS];
 let dirHandle = null;
+let pendingHandle = null; // stored handle awaiting user-gesture re-authorization
 const FS_SUPPORTED = 'showDirectoryPicker' in window;
 
 // ── IndexedDB helpers (persist directory handle across sessions) ──────────
@@ -62,16 +63,38 @@ async function connectFolder() {
     alert('File System Access is not supported in this browser.\nTry Chrome or Edge to save cards as files automatically.\n\nCards will continue to be saved in localStorage.');
     return;
   }
+
+  // If we have a stored handle that just needs re-authorization, use it directly
+  // (avoids forcing the user to re-pick the folder every session)
+  if (pendingHandle) {
+    try {
+      const perm = await pendingHandle.requestPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        dirHandle = pendingHandle;
+        pendingHandle = null;
+        await idbSet('dirHandle', dirHandle);
+        cards = await loadCardsFromDir(dirHandle);
+        updateFolderBtn();
+        render();
+        applySearch();
+        return;
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+    pendingHandle = null; // re-auth failed — fall through to fresh picker
+  }
+
   try {
     const h = await window.showDirectoryPicker({ mode: 'readwrite' });
     dirHandle = h;
     await idbSet('dirHandle', h);
     const fromFiles = await loadCardsFromDir(h);
-    // Merge: files win; append any localStorage-only cards not yet in files
+    // Merge: files win; migrate any localStorage-only cards to files
     const fileIds = new Set(fromFiles.map(c => c.id));
     const localOnly = cards.filter(c => !fileIds.has(c.id));
     cards = [...fromFiles, ...localOnly];
-    for (const c of localOnly) await writeCardFile(c); // migrate to files
+    for (const c of localOnly) await writeCardFile(c);
     updateFolderBtn();
     render();
     applySearch();
@@ -83,16 +106,20 @@ async function connectFolder() {
 function updateFolderBtn() {
   const btn = document.getElementById('folder-btn');
   if (!btn) return;
+  btn.classList.remove('connected', 'reconnect');
   if (dirHandle) {
     btn.textContent = '📁 ' + dirHandle.name;
     btn.title = 'Cards folder connected — click to change';
     btn.classList.add('connected');
+  } else if (pendingHandle) {
+    btn.textContent = '⚠ Reconnect ' + pendingHandle.name;
+    btn.title = 'Click to restore access to your cards folder';
+    btn.classList.add('reconnect');
   } else {
     btn.textContent = 'Connect folder';
     btn.title = FS_SUPPORTED
       ? 'Connect job_kanban/cards/ to save cards as individual JSON files'
       : 'File System Access not supported in this browser (try Chrome or Edge)';
-    btn.classList.remove('connected');
   }
 }
 
@@ -406,9 +433,14 @@ async function init() {
   if (FS_SUPPORTED) {
     try {
       const h = await idbGet('dirHandle');
-      if (h && (await h.queryPermission({ mode: 'readwrite' })) === 'granted') {
-        dirHandle = h;
-        cards = await loadCardsFromDir(h);
+      if (h) {
+        const perm = await h.queryPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+          dirHandle = h;
+          cards = await loadCardsFromDir(h);
+        } else if (perm === 'prompt') {
+          pendingHandle = h; // needs one click to re-authorize, no re-picking required
+        }
       }
     } catch {}
   }
