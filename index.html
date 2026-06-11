@@ -203,7 +203,7 @@
   <div class="search-wrap">
     <input type="search" id="search" placeholder="Search company, role, notes...">
   </div>
-  <div class="header-stats" id="stats">99 apps</div>
+  <div class="header-stats" id="stats">0 roles</div>
   <div class="header-actions">
     <button class="btn primary" onclick="openModal('new')">+ New</button>
     <button class="btn" onclick="exportJSON()">Export</button>
@@ -529,7 +529,7 @@ function render() {
   });
 
   document.getElementById('stats').textContent =
-    cards.length + ' apps · ' +
+    cards.length + ' roles · ' +
     (byColumn.applied   || []).length + ' pending · ' +
     (byColumn.interview || []).length + ' interviewing · ' +
     (byColumn.offer     || []).length + ' offers';
