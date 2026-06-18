@@ -38,11 +38,12 @@ def load_cards():
     return cards
 
 
-def build(output_path, cards, columns, head, tail):
+def build(output_path, cards, columns, head, tail, profile=None):
     columns_js = f"const COLUMNS = {json.dumps(columns, ensure_ascii=False)};\n"
     cards_js   = f"const ORIGINAL_CARDS = {json.dumps(cards, ensure_ascii=False)};\n"
+    profile_js = f"const ORIGINAL_PROFILE = {json.dumps(profile, ensure_ascii=False)};\n"
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write(head + columns_js + cards_js + tail)
+        f.write(head + columns_js + cards_js + profile_js + tail)
     print(f"Built {output_path} ({len(cards)} cards, {len(columns)} columns)")
 
 
@@ -56,16 +57,22 @@ def main():
     with open(TAIL_FILE, encoding="utf-8") as f:
         tail = f.read()
 
-    # Personal build — always empty ORIGINAL_CARDS; cards load at runtime via UI
-    build(PERSONAL_OUT, [], columns, head, tail)
+    # Personal build — always empty ORIGINAL_CARDS and no profile; data loads at runtime
+    build(PERSONAL_OUT, [], columns, head, tail, profile=None)
 
-    # Demo build — demo cards only, safe to commit
+    # Demo build — demo cards + example profile, safe to commit
     demo_paths = sorted(glob.glob(os.path.join(DEMO_DIR, "*.json")))
     demo_cards = []
     for p in demo_paths:
         with open(p, encoding="utf-8") as f:
             demo_cards.append(json.load(f))
-    build(DEMO_OUT, demo_cards, columns, head, tail)
+    demo_profile = {
+        "linkedin": "https://linkedin.com/in/johndoe",
+        "sites": [
+            {"label": "GitHub", "url": "https://github.com/johndoe"}
+        ]
+    }
+    build(DEMO_OUT, demo_cards, columns, head, tail, profile=demo_profile)
 
 
 if __name__ == "__main__":

@@ -302,6 +302,7 @@
 <script>
 const COLUMNS = [{"id": "saved", "name": "Saved", "color": "#4F8FE0", "desc": "Roles to look at later"}, {"id": "considering", "name": "Considering", "color": "#E0A24F", "desc": "Deciding whether to apply"}, {"id": "recruiter", "name": "Recruiter contact", "color": "#A04FE0", "desc": "Reached out via recruiter"}, {"id": "applied", "name": "Applied", "color": "#5F6F84", "desc": "Application submitted, waiting"}, {"id": "interview", "name": "Interview", "color": "#28A745", "desc": "Phone screen / interview scheduled or in-progress"}, {"id": "offer", "name": "Offer", "color": "#22C55E", "desc": "Received an offer"}, {"id": "rejected", "name": "Rejected", "color": "#C04040", "desc": "No further action - closed"}, {"id": "stale", "name": "Stale", "color": "#C47C20", "desc": "No response in 3+ months — auto-rejected after 6 months"}, {"id": "withdrawn", "name": "Withdrawn", "color": "#888888", "desc": "You withdrew your application"}];
 const ORIGINAL_CARDS = [];
+const ORIGINAL_PROFILE = null;
 // ── UI state (column positions/ordering — always localStorage) ────────────
 const UI_KEY = 'job-hunt-ui-v1';
 let uiState = { overrides: {}, columnOrder: {} };
@@ -780,7 +781,8 @@ let profile = { linkedin: '', sites: [] };
 
 function loadProfile(fileData) {
   try {
-    const src = fileData || JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+    const fromStorage = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+    const src = fileData || fromStorage || ORIGINAL_PROFILE || {};
     profile = { linkedin: '', sites: [], ...src };
     if (fileData) localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
   } catch {}
