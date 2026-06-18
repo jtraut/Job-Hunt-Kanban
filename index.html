@@ -12,6 +12,10 @@
     background: #f4f5f7;
     color: #172b4d;
     -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
   }
   header {
     background: #1e293b;
@@ -54,12 +58,65 @@
   .btn.primary:hover { background: #1d4ed8; }
   .btn.danger { background: #dc2626; border-color: #dc2626; }
   .btn.danger:hover { background: #b91c1c; }
+  .profile-bar {
+    background: #162032;
+    padding: 5px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #0f172a;
+    flex-shrink: 0;
+  }
+  .profile-sites { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .profile-field { display: flex; align-items: center; gap: 5px; }
+  .profile-sep { color: #334155; font-size: 15px; line-height: 1; user-select: none; flex-shrink: 0; }
+  .profile-label { font-size: 11px; color: #94a3b8; font-weight: 500; white-space: nowrap; }
+  .profile-label-input {
+    padding: 3px 6px;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    background: #1e293b;
+    color: #94a3b8;
+    font-size: 11px;
+    width: 64px;
+    font-family: inherit;
+  }
+  .profile-input {
+    padding: 3px 8px;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    background: #1e293b;
+    color: #cbd5e1;
+    font-size: 12px;
+    width: 200px;
+    font-family: inherit;
+  }
+  .profile-input:focus, .profile-label-input:focus { outline: none; border-color: #475569; background: #243047; }
+  .copy-btn {
+    background: none;
+    border: 1px solid #334155;
+    color: #64748b;
+    cursor: pointer;
+    padding: 2px 7px;
+    font-size: 11px;
+    border-radius: 4px;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { border-color: #475569; color: #94a3b8; }
+  .copy-btn.copied { color: #22c55e; border-color: #22c55e; }
+  .remove-btn { border-color: transparent; }
+  .remove-btn:hover { color: #f87171; border-color: #374151; background: none; }
+  .profile-add-btn { font-size: 11px; padding: 3px 8px; margin-left: auto; }
   .board {
     display: flex;
     gap: 12px;
     padding: 16px;
     overflow-x: auto;
-    height: calc(100vh - 56px);
+    flex: 1;
+    min-height: 0;
   }
   .column {
     flex: 0 0 300px;
@@ -210,6 +267,15 @@
     <button class="btn" id="folder-btn" onclick="connectFolder()">Connect folder</button>
   </div>
 </header>
+<div class="profile-bar">
+  <div class="profile-field">
+    <span class="profile-label">LinkedIn</span>
+    <input type="url" id="p-linkedin" class="profile-input" placeholder="linkedin.com/in/username" autocomplete="off" spellcheck="false">
+    <button class="copy-btn" id="p-linkedin-btn" onclick="copyFieldVal('p-linkedin', 'p-linkedin-btn')">Copy</button>
+  </div>
+  <div id="profile-sites" class="profile-sites"></div>
+  <button class="btn profile-add-btn" onclick="addProfileSite()">+ Site</button>
+</div>
 <div class="board" id="board"></div>
 <div class="modal-backdrop" id="modal-backdrop">
   <div class="modal">
@@ -276,9 +342,23 @@ async function idbSet(key, val) {
 }
 
 // ── File System Access helpers ────────────────────────────────────────────
+// Connected folder is the parent (e.g. job_kanban/); cards live in cards/, links in links/.
+// Falls back to using the handle itself for cards if no cards/ subdir exists (backward compat).
+async function getCardsDir(create = false) {
+  try { return await dirHandle.getDirectoryHandle('cards', { create }); } catch {}
+  return dirHandle;
+}
+
+async function getLinksDir(create = false) {
+  try { return await dirHandle.getDirectoryHandle('links', { create }); } catch {}
+  return null;
+}
+
 async function loadCardsFromDir(handle) {
+  let dir = handle;
+  try { dir = await handle.getDirectoryHandle('cards'); } catch {}
   const loaded = [];
-  for await (const [name, fh] of handle.entries()) {
+  for await (const [name, fh] of dir.entries()) {
     if (!name.endsWith('.json')) continue;
     try { loaded.push(JSON.parse(await (await fh.getFile()).text())); } catch {}
   }
@@ -286,14 +366,47 @@ async function loadCardsFromDir(handle) {
 }
 
 async function writeCardFile(card) {
-  const fh = await dirHandle.getFileHandle(card.id + '.json', { create: true });
-  const w  = await fh.createWritable();
+  const dir = await getCardsDir(true);
+  const fh  = await dir.getFileHandle(card.id + '.json', { create: true });
+  const w   = await fh.createWritable();
   await w.write(JSON.stringify(card, null, 2));
   await w.close();
 }
 
 async function removeCardFile(id) {
-  try { await dirHandle.removeEntry(id + '.json'); } catch {}
+  try { await (await getCardsDir()).removeEntry(id + '.json'); } catch {}
+}
+
+async function loadProfileFromDir(handle) {
+  try {
+    const linksDir = await handle.getDirectoryHandle('links');
+    const fh = await linksDir.getFileHandle('profile.json');
+    return JSON.parse(await (await fh.getFile()).text());
+  } catch { return null; }
+}
+
+async function writeProfileFile() {
+  if (!dirHandle) return;
+  const linksDir = await getLinksDir(true);
+  if (!linksDir) return;
+  try {
+    const fh = await linksDir.getFileHandle('profile.json', { create: true });
+    const w  = await fh.createWritable();
+    await w.write(JSON.stringify(profile, null, 2));
+    await w.close();
+  } catch (e) { console.warn('writeProfileFile failed', e); }
+}
+
+async function applyProfileFromDir(handle) {
+  const pData = await loadProfileFromDir(handle);
+  if (pData) {
+    profile = { linkedin: '', sites: [], ...pData };
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } else {
+    await writeProfileFile(); // migrate localStorage profile → file
+  }
+  document.getElementById('p-linkedin').value = profile.linkedin || '';
+  renderProfileSites();
 }
 
 async function connectFolder() {
@@ -312,6 +425,7 @@ async function connectFolder() {
         pendingHandle = null;
         await idbSet('dirHandle', dirHandle);
         cards = await loadCardsFromDir(dirHandle);
+        await applyProfileFromDir(dirHandle);
         updateFolderBtn();
         render();
         applySearch();
@@ -333,6 +447,7 @@ async function connectFolder() {
     const localOnly = cards.filter(c => !fileIds.has(c.id));
     cards = [...fromFiles, ...localOnly];
     for (const c of localOnly) await writeCardFile(c);
+    await applyProfileFromDir(h);
     updateFolderBtn();
     render();
     applySearch();
@@ -659,6 +774,83 @@ function exportJSON() {
   URL.revokeObjectURL(url);
 }
 
+// ── Profile (LinkedIn, personal sites) ───────────────────────────────────
+const PROFILE_KEY = 'job-hunt-profile-v1';
+let profile = { linkedin: '', sites: [] };
+
+function loadProfile(fileData) {
+  try {
+    const src = fileData || JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+    profile = { linkedin: '', sites: [], ...src };
+    if (fileData) localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch {}
+  const li = document.getElementById('p-linkedin');
+  li.value = profile.linkedin || '';
+  li.addEventListener('input', e => { profile.linkedin = e.target.value; saveProfile(); });
+  renderProfileSites();
+}
+
+function saveProfile() {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  writeProfileFile();
+}
+
+function renderProfileSites() {
+  const el = document.getElementById('profile-sites');
+  el.innerHTML = '';
+  profile.sites.forEach((site, i) => {
+    const sep = document.createElement('span');
+    sep.className = 'profile-sep';
+    sep.textContent = '|';
+    el.appendChild(sep);
+    const d = document.createElement('div');
+    d.className = 'profile-field';
+    d.innerHTML =
+      '<input type="text" class="profile-label-input" value="' + escapeHtml(site.label) + '" placeholder="Label" oninput="updateSiteLabel(' + i + ',this.value)">' +
+      '<input type="url" class="profile-input" value="' + escapeHtml(site.url) + '" placeholder="https://..." oninput="updateSiteUrl(' + i + ',this.value)">' +
+      '<button class="copy-btn" id="sc-' + i + '" onclick="copySiteVal(' + i + ',\'sc-' + i + '\')">Copy</button>' +
+      '<button class="copy-btn remove-btn" onclick="removeProfileSite(' + i + ')">✕</button>';
+    el.appendChild(d);
+  });
+}
+
+function updateSiteLabel(i, v) { profile.sites[i].label = v; saveProfile(); }
+function updateSiteUrl(i, v)   { profile.sites[i].url   = v; saveProfile(); }
+
+function addProfileSite() {
+  profile.sites.push({ label: '', url: '' });
+  saveProfile();
+  renderProfileSites();
+}
+
+function removeProfileSite(i) {
+  profile.sites.splice(i, 1);
+  saveProfile();
+  renderProfileSites();
+}
+
+async function copyFieldVal(inputId, btnId) {
+  const val = document.getElementById(inputId).value;
+  if (!val) return;
+  try { await navigator.clipboard.writeText(val); } catch { return; }
+  flashCopy(btnId);
+}
+
+async function copySiteVal(i, btnId) {
+  const val = profile.sites[i]?.url || '';
+  if (!val) return;
+  try { await navigator.clipboard.writeText(val); } catch { return; }
+  flashCopy(btnId);
+}
+
+function flashCopy(btnId) {
+  const btn = document.getElementById(btnId);
+  const orig = btn.textContent;
+  btn.textContent = '✓';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+}
+
 // ── Event listeners ───────────────────────────────────────────────────────
 document.getElementById('modal-backdrop').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-backdrop')) closeModal();
@@ -677,6 +869,7 @@ async function init() {
   }
 
   // Try to restore previously connected folder
+  let profileFileData = null;
   if (FS_SUPPORTED) {
     try {
       const h = await idbGet('dirHandle');
@@ -685,6 +878,7 @@ async function init() {
         if (perm === 'granted') {
           dirHandle = h;
           cards = await loadCardsFromDir(h);
+          profileFileData = await loadProfileFromDir(h);
         } else if (perm === 'prompt') {
           pendingHandle = h; // needs one click to re-authorize, no re-picking required
         }
@@ -692,6 +886,7 @@ async function init() {
     } catch {}
   }
 
+  loadProfile(profileFileData);
   updateFolderBtn();
   render();
   applySearch();

@@ -12,6 +12,10 @@
     background: #f4f5f7;
     color: #172b4d;
     -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
   }
   header {
     background: #1e293b;
@@ -54,12 +58,65 @@
   .btn.primary:hover { background: #1d4ed8; }
   .btn.danger { background: #dc2626; border-color: #dc2626; }
   .btn.danger:hover { background: #b91c1c; }
+  .profile-bar {
+    background: #162032;
+    padding: 5px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #0f172a;
+    flex-shrink: 0;
+  }
+  .profile-sites { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .profile-field { display: flex; align-items: center; gap: 5px; }
+  .profile-sep { color: #334155; font-size: 15px; line-height: 1; user-select: none; flex-shrink: 0; }
+  .profile-label { font-size: 11px; color: #94a3b8; font-weight: 500; white-space: nowrap; }
+  .profile-label-input {
+    padding: 3px 6px;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    background: #1e293b;
+    color: #94a3b8;
+    font-size: 11px;
+    width: 64px;
+    font-family: inherit;
+  }
+  .profile-input {
+    padding: 3px 8px;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    background: #1e293b;
+    color: #cbd5e1;
+    font-size: 12px;
+    width: 200px;
+    font-family: inherit;
+  }
+  .profile-input:focus, .profile-label-input:focus { outline: none; border-color: #475569; background: #243047; }
+  .copy-btn {
+    background: none;
+    border: 1px solid #334155;
+    color: #64748b;
+    cursor: pointer;
+    padding: 2px 7px;
+    font-size: 11px;
+    border-radius: 4px;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .copy-btn:hover { border-color: #475569; color: #94a3b8; }
+  .copy-btn.copied { color: #22c55e; border-color: #22c55e; }
+  .remove-btn { border-color: transparent; }
+  .remove-btn:hover { color: #f87171; border-color: #374151; background: none; }
+  .profile-add-btn { font-size: 11px; padding: 3px 8px; margin-left: auto; }
   .board {
     display: flex;
     gap: 12px;
     padding: 16px;
     overflow-x: auto;
-    height: calc(100vh - 56px);
+    flex: 1;
+    min-height: 0;
   }
   .column {
     flex: 0 0 300px;
@@ -210,6 +267,15 @@
     <button class="btn" id="folder-btn" onclick="connectFolder()">Connect folder</button>
   </div>
 </header>
+<div class="profile-bar">
+  <div class="profile-field">
+    <span class="profile-label">LinkedIn</span>
+    <input type="url" id="p-linkedin" class="profile-input" placeholder="linkedin.com/in/username" autocomplete="off" spellcheck="false">
+    <button class="copy-btn" id="p-linkedin-btn" onclick="copyFieldVal('p-linkedin', 'p-linkedin-btn')">Copy</button>
+  </div>
+  <div id="profile-sites" class="profile-sites"></div>
+  <button class="btn profile-add-btn" onclick="addProfileSite()">+ Site</button>
+</div>
 <div class="board" id="board"></div>
 <div class="modal-backdrop" id="modal-backdrop">
   <div class="modal">
