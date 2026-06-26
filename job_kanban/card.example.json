@@ -6,6 +6,7 @@
   "salary": "150-180K",
   "location": "Remote",
   "link": "https://example.com/jobs/12345",
+  "tags": ["startup"],
   "notes": "Cover letter sent. Recruiter: Jane Smith (jane@acme.com)\nPhone screen scheduled for June 5.",
   "status_label": "Applied",
   "column": "applied"

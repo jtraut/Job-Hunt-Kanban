@@ -242,6 +242,7 @@ function renderCard(card, colColor) {
   if (card.date)     meta.push('<span class="chip date">'     + escapeHtml(card.date)     + '</span>');
   if (card.salary)   meta.push('<span class="chip salary">'   + escapeHtml(card.salary)   + '</span>');
   if (card.location) meta.push('<span class="chip location">' + escapeHtml(card.location) + '</span>');
+  if (Array.isArray(card.tags)) card.tags.forEach(t => { if (t) meta.push('<span class="chip tag">' + escapeHtml(t) + '</span>'); });
 
   div.innerHTML =
     '<div class="card-company">' + escapeHtml(card.company) + '</div>' +
@@ -385,12 +386,13 @@ function openModal(mode, cardId) {
     document.getElementById('f-salary').value   = card.salary   || '';
     document.getElementById('f-location').value = card.location || '';
     document.getElementById('f-link').value     = card.link     || '';
+    document.getElementById('f-tags').value     = Array.isArray(card.tags) ? card.tags.join(', ') : '';
     document.getElementById('f-notes').value    = card.notes    || '';
     populateColumnSelect(getColumn(card));
     deleteBtn.classList.remove('hidden');
   } else {
     document.getElementById('modal-title').textContent = 'New application';
-    ['f-company','f-role','f-date','f-salary','f-location','f-link','f-notes']
+    ['f-company','f-role','f-date','f-salary','f-location','f-link','f-tags','f-notes']
       .forEach(id => { document.getElementById(id).value = ''; });
     populateColumnSelect('applied');
     deleteBtn.classList.add('hidden');
@@ -413,6 +415,7 @@ async function saveModal() {
     salary:       document.getElementById('f-salary').value.trim(),
     location:     document.getElementById('f-location').value.trim(),
     link:         document.getElementById('f-link').value.trim(),
+    tags:         document.getElementById('f-tags').value.split(',').map(s => s.trim()).filter(Boolean),
     notes:        document.getElementById('f-notes').value,
     column,
     status_label: (COLUMNS.find(c => c.id === column) || {}).name || column,

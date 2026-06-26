@@ -170,6 +170,7 @@
   .chip.salary { background: #e3fcef; color: #006644; border-color: #abf5d1; }
   .chip.location { background: #deebff; color: #0747a6; border-color: #b3d4ff; }
   .chip.date { background: #fff; color: #6b778c; }
+  .chip.tag { background: #eae6ff; color: #5243aa; border-color: #c0b6f2; font-weight: 600; text-transform: capitalize; }
   .card-actions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
   .card-actions a, .card-actions button {
     font-size: 11px;
@@ -290,6 +291,7 @@
       <div class="field"><label>Location</label><input type="text" id="f-location" placeholder="e.g. Remote"></div>
     </div>
     <div class="field" style="margin-bottom: 12px;"><label>Apply Link</label><input type="url" id="f-link" placeholder="https://..."></div>
+    <div class="field" style="margin-bottom: 12px;"><label>Tags</label><input type="text" id="f-tags" placeholder="comma-separated, e.g. startup"></div>
     <div class="field" style="margin-bottom: 12px;"><label>Status</label><select id="f-column"></select></div>
     <div class="field" style="margin-bottom: 8px;"><label>Notes</label><textarea id="f-notes" rows="4" placeholder="Cover letter drafts, recruiter info, interview prep..."></textarea></div>
     <div class="modal-actions">
