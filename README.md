@@ -17,6 +17,7 @@ A kanban-style job application tracker that runs as a single HTML file — no se
 - **File-backed storage** (Chrome/Edge): connect your `job_kanban/` folder and cards save as individual JSON files in real time
 - **localStorage fallback**: works in any browser without connecting a folder
 - Export the full board to JSON at any time
+- **Auto job-fetcher** (optional): a scheduled agent that finds new roles matching your preferences and adds them as cards — configured right in the board. See [`job_kanban/agent/`](job_kanban/agent/README.md).
 
 ---
 
@@ -45,6 +46,7 @@ From that point on, every add/edit/delete writes directly to files, organized in
 ```
 job_kanban/
 ├── cards/        ← one JSON file per role
+├── agent/        ← optional auto job-fetcher (config.json is gitignored)
 └── links/
     └── profile.json   ← your LinkedIn and personal site URLs
 ```

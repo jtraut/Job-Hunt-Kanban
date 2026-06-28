@@ -122,6 +122,7 @@ async function connectFolder() {
         await idbSet('dirHandle', dirHandle);
         cards = await loadCardsFromDir(dirHandle);
         await applyProfileFromDir(dirHandle);
+        await applyAgentConfigFromDir(dirHandle);
         updateFolderBtn();
         render();
         applySearch();
@@ -144,6 +145,7 @@ async function connectFolder() {
     cards = [...fromFiles, ...localOnly];
     for (const c of localOnly) await writeCardFile(c);
     await applyProfileFromDir(h);
+    await applyAgentConfigFromDir(h);
     updateFolderBtn();
     render();
     applySearch();
@@ -551,6 +553,135 @@ function flashCopy(btnId) {
   setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
 }
 
+// ── Agent (auto job-fetcher) settings ─────────────────────────────────────
+// Persisted to agent/config.json in the connected folder (gitignored), read
+// by agent/fetch_roles.py. localStorage mirrors it for browsers without a folder.
+const AGENT_KEY = 'job-hunt-agent-v1';
+const DEFAULT_AGENT = {
+  enabled: false,
+  roles_per_day: 3,
+  schedule: { time: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] },
+  tracks: [],
+  salary: { min: 140000, max: 250000, currency: 'USD' },
+  location: { modes: ['remote'], base: '' },
+  exclusions: [],
+  seniority: 'senior',
+  sources: { use_cowork_connectors: true, startup_boards: [], pluggable_api_keys: {} },
+  notes: '',
+  target_column: 'saved',
+};
+let agentConfig = JSON.parse(JSON.stringify(DEFAULT_AGENT));
+
+function applyAgentData(data) {
+  const d = data || {};
+  agentConfig = {
+    ...DEFAULT_AGENT, ...d,
+    schedule: { ...DEFAULT_AGENT.schedule, ...(d.schedule || {}) },
+    salary:   { ...DEFAULT_AGENT.salary,   ...(d.salary   || {}) },
+    location: { ...DEFAULT_AGENT.location, ...(d.location || {}) },
+    sources:  { ...DEFAULT_AGENT.sources,  ...(d.sources  || {}) },
+  };
+  localStorage.setItem(AGENT_KEY, JSON.stringify(agentConfig));
+}
+
+async function getAgentDir(create = false) {
+  if (!dirHandle) return null;
+  try { return await dirHandle.getDirectoryHandle('agent', { create }); } catch { return null; }
+}
+
+async function loadAgentConfigFromDir(handle) {
+  try {
+    const dir = await handle.getDirectoryHandle('agent');
+    const fh = await dir.getFileHandle('config.json');
+    const raw = JSON.parse(await (await fh.getFile()).text());
+    Object.keys(raw).forEach(k => { if (k.startsWith('_')) delete raw[k]; });
+    return raw;
+  } catch { return null; }
+}
+
+async function writeAgentConfigFile() {
+  const dir = await getAgentDir(true);
+  if (!dir) return;
+  try {
+    const fh = await dir.getFileHandle('config.json', { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify(agentConfig, null, 2));
+    await w.close();
+  } catch (e) { console.warn('writeAgentConfigFile failed', e); }
+}
+
+async function applyAgentConfigFromDir(handle) {
+  const data = await loadAgentConfigFromDir(handle);
+  if (data) { applyAgentData(data); }
+  else {
+    try { const ls = JSON.parse(localStorage.getItem(AGENT_KEY) || 'null'); if (ls) agentConfig = ls; } catch {}
+    await writeAgentConfigFile();
+  }
+}
+
+function setChecks(groupId, values) {
+  const set = new Set(values);
+  document.querySelectorAll('#' + groupId + ' input[type=checkbox]').forEach(cb => { cb.checked = set.has(cb.value); });
+}
+function getChecks(groupId) {
+  return [...document.querySelectorAll('#' + groupId + ' input[type=checkbox]')].filter(cb => cb.checked).map(cb => cb.value);
+}
+const linesToArr = v => v.split('\n').map(s => s.trim()).filter(Boolean);
+
+function openAgentModal() {
+  const c = agentConfig;
+  document.getElementById('a-enabled').checked = !!c.enabled;
+  document.getElementById('a-count').value = c.roles_per_day ?? 3;
+  document.getElementById('a-time').value = (c.schedule && c.schedule.time) || '08:00';
+  setChecks('a-days', (c.schedule && c.schedule.days) || []);
+  document.getElementById('a-tracks').value = (c.tracks || []).join('\n');
+  document.getElementById('a-sal-min').value = (c.salary && c.salary.min) || '';
+  document.getElementById('a-sal-max').value = (c.salary && c.salary.max) || '';
+  setChecks('a-modes', (c.location && c.location.modes) || []);
+  document.getElementById('a-base').value = (c.location && c.location.base) || '';
+  document.getElementById('a-exclusions').value = (c.exclusions || []).join('\n');
+  document.getElementById('a-boards').value = ((c.sources && c.sources.startup_boards) || []).join('\n');
+  document.getElementById('a-notes').value = c.notes || '';
+  document.getElementById('agent-modal-backdrop').classList.add('open');
+}
+
+function closeAgentModal() { document.getElementById('agent-modal-backdrop').classList.remove('open'); }
+
+async function saveAgentModal() {
+  const c = agentConfig;
+  c.enabled = document.getElementById('a-enabled').checked;
+  c.roles_per_day = parseInt(document.getElementById('a-count').value, 10) || 3;
+  c.schedule = c.schedule || {};
+  c.schedule.time = document.getElementById('a-time').value || '08:00';
+  c.schedule.days = getChecks('a-days');
+  if (c.schedule.days.length === 0) c.schedule.days = ['mon', 'tue', 'wed', 'thu', 'fri'];
+  c.tracks = linesToArr(document.getElementById('a-tracks').value);
+  c.salary = c.salary || {};
+  c.salary.min = parseInt(document.getElementById('a-sal-min').value, 10) || null;
+  c.salary.max = parseInt(document.getElementById('a-sal-max').value, 10) || null;
+  c.salary.currency = c.salary.currency || 'USD';
+  c.location = c.location || {};
+  c.location.modes = getChecks('a-modes');
+  if (c.location.modes.length === 0) c.location.modes = ['remote'];
+  c.location.base = document.getElementById('a-base').value.trim();
+  c.exclusions = linesToArr(document.getElementById('a-exclusions').value);
+  c.sources = c.sources || {};
+  c.sources.startup_boards = linesToArr(document.getElementById('a-boards').value);
+  if (typeof c.sources.use_cowork_connectors !== 'boolean') c.sources.use_cowork_connectors = true;
+  c.sources.pluggable_api_keys = c.sources.pluggable_api_keys || {};
+  c.notes = document.getElementById('a-notes').value.trim();
+  c.target_column = c.target_column || 'saved';
+  localStorage.setItem(AGENT_KEY, JSON.stringify(c));
+  await writeAgentConfigFile();
+  closeAgentModal();
+  if (!dirHandle) alert('Saved in this browser. Connect your folder so the settings are written to agent/config.json for the fetcher script to read.');
+}
+
+document.getElementById('agent-modal-backdrop').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeAgentModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAgentModal(); });
+
 // ── Event listeners ───────────────────────────────────────────────────────
 document.getElementById('modal-backdrop').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-backdrop')) closeModal();
@@ -587,6 +718,8 @@ async function init() {
   }
 
   loadProfile(profileFileData);
+  if (dirHandle) { await applyAgentConfigFromDir(dirHandle); }
+  else { try { const ls = JSON.parse(localStorage.getItem(AGENT_KEY) || 'null'); if (ls) applyAgentData(ls); } catch {} }
   updateFolderBtn();
   render();
   applySearch();

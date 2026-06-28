@@ -4,3 +4,12 @@ job_kanban/cards/links/
 job_kanban/links/*.json
 job_kanban/cards.json
 job_kanban/parsed.json
+
+# Auto job-fetcher: secrets, local prefs, runtime artifacts
+# (agent/config.json is your personal copy; agent/config.example.json stays committed)
+.env
+job_kanban/agent/.env
+job_kanban/agent/config.json
+job_kanban/agent/agent_run.log
+__pycache__/
+*.pyc

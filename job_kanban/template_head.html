@@ -253,6 +253,12 @@
   }
   .modal-actions .left { margin-right: auto; }
   .required-mark { color: #dc2626; }
+  .check-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .check-row label { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 400; cursor: pointer; }
+  .agent-hint { font-size: 12px; color: #6b778c; margin: 2px 0 14px; line-height: 1.5; }
+  .agent-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .agent-toggle input { width: auto; margin: 0; flex-shrink: 0; }
+  .modal.wide { max-width: 620px; }
 </style>
 </head>
 <body>
@@ -265,6 +271,7 @@
   <div class="header-actions">
     <button class="btn primary" onclick="openModal('new')">+ New</button>
     <button class="btn" onclick="exportJSON()">Export</button>
+    <button class="btn" onclick="openAgentModal()" title="Auto job-fetcher settings">⚙ Agent</button>
     <button class="btn" id="folder-btn" onclick="connectFolder()">Connect folder</button>
   </div>
 </header>
@@ -298,6 +305,77 @@
       <button class="btn danger left hidden" id="modal-delete-btn" onclick="deleteCurrent()">Delete</button>
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn primary" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="agent-modal-backdrop">
+  <div class="modal wide">
+    <h2>Auto job-fetcher</h2>
+    <p class="agent-hint">Finds new roles on a schedule and adds them as cards in your chosen column.
+      Settings save to <code>agent/config.json</code> in your connected folder (gitignored).
+      Run it with <code>agent/fetch_roles.py</code> (needs an Anthropic API key) and schedule it via
+      <code>agent/install_schedule.py</code>. See <code>agent/README.md</code>.</p>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label class="agent-toggle"><input type="checkbox" id="a-enabled"> Enable auto-fetching</label>
+    </div>
+
+    <div class="modal-row">
+      <div class="field"><label>Roles per day</label><input type="number" id="a-count" min="1" max="20" step="1"></div>
+      <div class="field"><label>Run time</label><input type="time" id="a-time"></div>
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label>Days of week</label>
+      <div class="check-row" id="a-days">
+        <label><input type="checkbox" value="mon"> Mon</label>
+        <label><input type="checkbox" value="tue"> Tue</label>
+        <label><input type="checkbox" value="wed"> Wed</label>
+        <label><input type="checkbox" value="thu"> Thu</label>
+        <label><input type="checkbox" value="fri"> Fri</label>
+        <label><input type="checkbox" value="sat"> Sat</label>
+        <label><input type="checkbox" value="sun"> Sun</label>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label>Role tracks (one per line)</label>
+      <textarea id="a-tracks" rows="3" placeholder="Senior Backend Engineer&#10;Senior Full-Stack Engineer"></textarea>
+    </div>
+
+    <div class="modal-row">
+      <div class="field"><label>Salary min (USD)</label><input type="number" id="a-sal-min" step="5000" placeholder="140000"></div>
+      <div class="field"><label>Salary max (USD)</label><input type="number" id="a-sal-max" step="5000" placeholder="250000"></div>
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label>Location</label>
+      <div class="check-row" id="a-modes" style="margin-bottom: 8px;">
+        <label><input type="checkbox" value="remote"> Remote</label>
+        <label><input type="checkbox" value="hybrid"> Hybrid</label>
+        <label><input type="checkbox" value="onsite"> On-site</label>
+      </div>
+      <input type="text" id="a-base" placeholder="Base city for hybrid/on-site, e.g. Denver, CO">
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label>Exclude (one per line)</label>
+      <textarea id="a-exclusions" rows="2" placeholder="DoD / defense contractors&#10;roles requiring a security clearance"></textarea>
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label>Preferred job boards (one per line)</label>
+      <textarea id="a-boards" rows="2" placeholder="startups.gallery&#10;wellfound.com&#10;ycombinator.com"></textarea>
+    </div>
+
+    <div class="field" style="margin-bottom: 8px;">
+      <label>Other preferences</label>
+      <textarea id="a-notes" rows="3" placeholder="e.g. prefer direct ATS links; tag startups; favor a mix across tracks"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeAgentModal()">Cancel</button>
+      <button class="btn primary" onclick="saveAgentModal()">Save settings</button>
     </div>
   </div>
 </div>

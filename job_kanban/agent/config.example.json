@@ -1,0 +1,51 @@
+{
+  "_comment": "Auto job-fetcher preferences. Set these in the board's 'Agent' settings panel, OR copy this file to ./config.json (same folder) and edit by hand. agent/config.json is gitignored, so your personal preferences never get committed.",
+
+  "enabled": false,
+
+  "roles_per_day": 3,
+
+  "schedule": {
+    "_comment": "24h local time and which weekdays to run. Default is Mon-Fri.",
+    "time": "08:00",
+    "days": ["mon", "tue", "wed", "thu", "fri"]
+  },
+
+  "tracks": [
+    "Senior Backend Engineer",
+    "Senior Full-Stack Engineer"
+  ],
+
+  "salary": {
+    "min": 140000,
+    "max": 250000,
+    "currency": "USD"
+  },
+
+  "location": {
+    "_comment": "modes: any of 'remote', 'hybrid', 'onsite'. base: city used for hybrid/onsite searches.",
+    "modes": ["remote"],
+    "base": ""
+  },
+
+  "exclusions": [
+    "roles requiring a security clearance"
+  ],
+
+  "seniority": "senior",
+
+  "sources": {
+    "_comment": "use_cowork_connectors only applies when run inside Claude Cowork. pluggable_api_keys lets you add your own job-board API adapters (see agent/sources/). If none are configured, the runner falls back to Claude web search.",
+    "use_cowork_connectors": true,
+    "startup_boards": [
+      "startups.gallery",
+      "wellfound.com",
+      "ycombinator.com"
+    ],
+    "pluggable_api_keys": {}
+  },
+
+  "notes": "Prefer direct ATS links (greenhouse.io, lever.co, ashbyhq.com, or company careers pages) over aggregators. Tag venture-backed startups with the 'startup' tag.",
+
+  "target_column": "saved"
+}
