@@ -478,6 +478,21 @@ async function writeProfileFile() {
   } catch (e) { console.warn('writeProfileFile failed', e); }
 }
 
+// Prepend file-loaded cards that aren't in any columnOrder to the front of their
+// column (sorted oldest→newest so the last prepend — the newest card — ends up on top).
+// This ensures agent-written cards appear above older user-placed cards on load.
+function registerNewCards(loadedCards) {
+  const knownIds = new Set(Object.values(uiState.columnOrder).flat());
+  const fresh = loadedCards
+    .filter(c => !knownIds.has(c.id))
+    .sort((a, b) => parseDate(a.date) - parseDate(b.date));
+  fresh.forEach(card => {
+    const col = card.column || 'saved';
+    uiState.columnOrder[col] = [card.id, ...(uiState.columnOrder[col] || [])];
+  });
+  if (fresh.length) saveUI();
+}
+
 async function applyProfileFromDir(handle) {
   const pData = await loadProfileFromDir(handle);
   if (pData) {
@@ -506,6 +521,7 @@ async function connectFolder() {
         pendingHandle = null;
         await idbSet('dirHandle', dirHandle);
         cards = await loadCardsFromDir(dirHandle);
+        registerNewCards(cards);
         await applyProfileFromDir(dirHandle);
         await applyAgentConfigFromDir(dirHandle);
         updateFolderBtn();
@@ -529,6 +545,7 @@ async function connectFolder() {
     const localOnly = cards.filter(c => !fileIds.has(c.id));
     cards = [...fromFiles, ...localOnly];
     for (const c of localOnly) await writeCardFile(c);
+    registerNewCards(cards);
     await applyProfileFromDir(h);
     await applyAgentConfigFromDir(h);
     updateFolderBtn();
@@ -1094,6 +1111,7 @@ async function init() {
         if (perm === 'granted') {
           dirHandle = h;
           cards = await loadCardsFromDir(h);
+          registerNewCards(cards);
           profileFileData = await loadProfileFromDir(h);
         } else if (perm === 'prompt') {
           pendingHandle = h; // needs one click to re-authorize, no re-picking required
